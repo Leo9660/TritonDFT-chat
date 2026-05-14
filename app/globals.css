@@ -1,0 +1,56 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+@import "highlight.js/styles/github-dark.css";
+
+:root {
+  --bg: #ffffff;
+  --bg-elev: #f7f7f8;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2563eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0d0d;
+    --bg-elev: #1a1a1a;
+    --fg: #ececec;
+    --muted: #9ca3af;
+    --border: #2a2a2a;
+    --accent: #3b82f6;
+  }
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  height: 100%;
+}
+
+.prose-msg pre {
+  background: #0d1117;
+  padding: 0.75rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+
+.prose-msg code:not(pre code) {
+  background: var(--bg-elev);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.prose-msg p { margin: 0.5rem 0; line-height: 1.6; }
+.prose-msg ul, .prose-msg ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.prose-msg li { margin: 0.25rem 0; }
+.prose-msg h1, .prose-msg h2, .prose-msg h3 { margin: 1rem 0 0.5rem; font-weight: 600; }
+.prose-msg h1 { font-size: 1.4rem; }
+.prose-msg h2 { font-size: 1.2rem; }
+.prose-msg h3 { font-size: 1.05rem; }
+.prose-msg blockquote { border-left: 3px solid var(--border); padding-left: 0.8rem; color: var(--muted); }
+.prose-msg table { border-collapse: collapse; margin: 0.5rem 0; }
+.prose-msg th, .prose-msg td { border: 1px solid var(--border); padding: 0.3rem 0.6rem; }
+.prose-msg a { color: var(--accent); text-decoration: underline; }

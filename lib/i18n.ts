@@ -1,41 +1,60 @@
-import i18nConfig from "@/i18nConfig"
-import { createInstance } from "i18next"
-import resourcesToBackend from "i18next-resources-to-backend"
-import { initReactI18next } from "react-i18next/initReactI18next"
+"use client";
 
-export default async function initTranslations(
-  locale: any,
-  namespaces: any,
-  i18nInstance?: any,
-  resources?: any
-) {
-  i18nInstance = i18nInstance || createInstance()
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
 
-  i18nInstance.use(initReactI18next)
+const resources = {
+  en: {
+    translation: {
+      appTitle: "TritonDFT",
+      newChat: "New chat",
+      noConversations: "No conversations yet",
+      send: "Send",
+      stop: "Stop",
+      placeholder: "Ask TritonDFT to run a DFT calculation…",
+      attachImage: "Attach image (coming soon)",
+      thinking: "Thinking…",
+      delete: "Delete",
+      confirmDelete: "Delete this conversation?",
+      settings: "Settings",
+      backendUrl: "Backend URL",
+      save: "Save",
+      cancel: "Cancel",
+      errorPrefix: "Error: ",
+      copy: "Copy",
+      copied: "Copied",
+    },
+  },
+  zh: {
+    translation: {
+      appTitle: "TritonDFT",
+      newChat: "新建对话",
+      noConversations: "暂无对话",
+      send: "发送",
+      stop: "停止",
+      placeholder: "向 TritonDFT 描述你的 DFT 任务…",
+      attachImage: "上传图片（即将上线）",
+      thinking: "思考中…",
+      delete: "删除",
+      confirmDelete: "确认删除这个对话？",
+      settings: "设置",
+      backendUrl: "后端地址",
+      save: "保存",
+      cancel: "取消",
+      errorPrefix: "错误：",
+      copy: "复制",
+      copied: "已复制",
+    },
+  },
+};
 
-  if (!resources) {
-    i18nInstance.use(
-      resourcesToBackend(
-        (language: string, namespace: string) =>
-          import(`/public/locales/${language}/${namespace}.json`)
-      )
-    )
-  }
-
-  await i18nInstance.init({
-    lng: locale,
+if (!i18n.isInitialized) {
+  i18n.use(initReactI18next).init({
     resources,
-    fallbackLng: i18nConfig.defaultLocale,
-    supportedLngs: i18nConfig.locales,
-    defaultNS: namespaces[0],
-    fallbackNS: namespaces[0],
-    ns: namespaces,
-    preload: resources ? [] : i18nConfig.locales
-  })
-
-  return {
-    i18n: i18nInstance,
-    resources: i18nInstance.services.resourceStore.data,
-    t: i18nInstance.t
-  }
+    lng: "en",
+    fallbackLng: "en",
+    interpolation: { escapeValue: false },
+  });
 }
+
+export default i18n;
