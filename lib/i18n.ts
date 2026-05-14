@@ -23,6 +23,10 @@ const resources = {
       errorPrefix: "Error: ",
       copy: "Copy",
       copied: "Copied",
+      emptyTitle: "DFT, in your browser.",
+      emptySubtitle:
+        "Describe what you want — a material, a property, a workflow. The agent picks parameters, runs Quantum ESPRESSO, and reports back.",
+      emptyHint: "⌘/Ctrl + Enter to send · localStorage history",
     },
   },
   zh: {
@@ -44,6 +48,10 @@ const resources = {
       errorPrefix: "错误：",
       copy: "复制",
       copied: "已复制",
+      emptyTitle: "把 DFT 装进浏览器。",
+      emptySubtitle:
+        "描述你想要的 —— 材料、属性、工作流。Agent 自动选参数、跑 Quantum ESPRESSO、返回结果。",
+      emptyHint: "⌘/Ctrl + Enter 发送 · 对话历史存浏览器",
     },
   },
 };

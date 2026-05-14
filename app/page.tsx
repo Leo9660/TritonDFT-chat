@@ -10,6 +10,7 @@ import { TopBar } from "@/components/TopBar";
 import { ChatInput } from "@/components/ChatInput";
 import { ChatMessages } from "@/components/ChatMessages";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { EmptyState } from "@/components/EmptyState";
 
 import { Conversation, Lang, Message } from "@/lib/types";
 import {
@@ -80,97 +81,103 @@ export default function Page() {
     [activeId],
   );
 
-  const sendMessage = useCallback(async () => {
-    if (!input.trim()) return;
-    let convId = activeId;
-    if (!convId) {
-      const id = nanoid(10);
-      const fresh: Conversation = {
-        id,
-        title: "",
-        messages: [],
+  // Core send: accepts an explicit prompt (used by EmptyState chips) and
+  // falls back to the live input.
+  const sendMessage = useCallback(
+    async (overrideText?: string) => {
+      const text = (overrideText ?? input).trim();
+      if (!text) return;
+
+      let convId = activeId;
+      let baseHistory: Message[] = active?.messages ?? [];
+
+      if (!convId || (overrideText && (active?.messages.length ?? 0) === 0 && active === null)) {
+        const id = nanoid(10);
+        const fresh: Conversation = {
+          id,
+          title: "",
+          messages: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        setConversations((cs) => [fresh, ...cs]);
+        setActiveId(id);
+        convId = id;
+        baseHistory = [];
+      }
+
+      const userMsg: Message = {
+        id: nanoid(8),
+        role: "user",
+        content: text,
         createdAt: Date.now(),
-        updatedAt: Date.now(),
       };
-      setConversations((cs) => [fresh, ...cs]);
-      setActiveId(id);
-      convId = id;
-    }
+      const assistantMsg: Message = {
+        id: nanoid(8),
+        role: "assistant",
+        content: "",
+        createdAt: Date.now(),
+      };
 
-    const userMsg: Message = {
-      id: nanoid(8),
-      role: "user",
-      content: input.trim(),
-      createdAt: Date.now(),
-    };
-    const assistantMsg: Message = {
-      id: nanoid(8),
-      role: "assistant",
-      content: "",
-      createdAt: Date.now(),
-    };
+      setConversations((cs) =>
+        cs.map((c) =>
+          c.id === convId
+            ? {
+                ...c,
+                title: c.title || text.slice(0, 40),
+                messages: [...c.messages, userMsg, assistantMsg],
+                updatedAt: Date.now(),
+              }
+            : c,
+        ),
+      );
+      if (!overrideText) setInput("");
+      setIsStreaming(true);
 
-    setConversations((cs) =>
-      cs.map((c) =>
-        c.id === convId
-          ? {
-              ...c,
-              title: c.title || userMsg.content.slice(0, 40),
-              messages: [...c.messages, userMsg, assistantMsg],
-              updatedAt: Date.now(),
-            }
-          : c,
-      ),
-    );
-    setInput("");
-    setIsStreaming(true);
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
 
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
+      const baseMsgs: Message[] = [...baseHistory, userMsg];
 
-    const baseMsgs: Message[] = [...(active?.messages ?? []), userMsg];
+      await streamChat(backendUrl, baseMsgs, ctrl.signal, {
+        onDelta: (delta) => {
+          setConversations((cs) =>
+            cs.map((c) =>
+              c.id === convId
+                ? {
+                    ...c,
+                    messages: c.messages.map((m, i) =>
+                      i === c.messages.length - 1 ? { ...m, content: m.content + delta } : m,
+                    ),
+                  }
+                : c,
+            ),
+          );
+        },
+        onDone: () => setIsStreaming(false),
+        onError: (err) => {
+          setConversations((cs) =>
+            cs.map((c) =>
+              c.id === convId
+                ? {
+                    ...c,
+                    messages: c.messages.map((m, i) =>
+                      i === c.messages.length - 1
+                        ? { ...m, content: m.content + `\n\n**Error:** ${err.message}` }
+                        : m,
+                    ),
+                  }
+                : c,
+            ),
+          );
+          setIsStreaming(false);
+        },
+      });
+    },
+    [input, activeId, active, backendUrl],
+  );
 
-    await streamChat(backendUrl, baseMsgs, ctrl.signal, {
-      onDelta: (delta) => {
-        setConversations((cs) =>
-          cs.map((c) =>
-            c.id === convId
-              ? {
-                  ...c,
-                  messages: c.messages.map((m, i) =>
-                    i === c.messages.length - 1 ? { ...m, content: m.content + delta } : m,
-                  ),
-                }
-              : c,
-          ),
-        );
-      },
-      onDone: () => {
-        setIsStreaming(false);
-      },
-      onError: (err) => {
-        setConversations((cs) =>
-          cs.map((c) =>
-            c.id === convId
-              ? {
-                  ...c,
-                  messages: c.messages.map((m, i) =>
-                    i === c.messages.length - 1
-                      ? { ...m, content: m.content + `\n\n**Error:** ${err.message}` }
-                      : m,
-                  ),
-                }
-              : c,
-          ),
-        );
-        setIsStreaming(false);
-      },
-    });
-  }, [input, activeId, active, backendUrl]);
-
-  const stopStreaming = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+  const stopStreaming = useCallback(() => abortRef.current?.abort(), []);
 
   const toggleLang = useCallback(() => {
     const next: Lang = lang === "en" ? "zh" : "en";
@@ -183,6 +190,8 @@ export default function Page() {
     return <div className="h-screen w-screen" />;
   }
 
+  const showEmpty = !active || active.messages.length === 0;
+
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       <Sidebar
@@ -194,16 +203,23 @@ export default function Page() {
       />
       <main className="flex-1 flex flex-col min-w-0">
         <TopBar lang={lang} onToggleLang={toggleLang} onOpenSettings={() => setSettingsOpen(true)} />
-        <ChatMessages messages={active?.messages ?? []} isStreaming={isStreaming} />
+        {showEmpty ? (
+          <EmptyState onPrompt={(text) => sendMessage(text)} />
+        ) : (
+          <ChatMessages messages={active!.messages} isStreaming={isStreaming} />
+        )}
         <div className="px-4 py-3 max-w-3xl w-full mx-auto">
           <ChatInput
             value={input}
             onChange={setInput}
-            onSend={sendMessage}
+            onSend={() => sendMessage()}
             onStop={stopStreaming}
             isStreaming={isStreaming}
           />
-          <div className="text-center text-xs text-[var(--muted)] mt-1.5">
+          <div
+            className="text-center text-xs mt-1.5"
+            style={{ color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}
+          >
             ⌘/Ctrl + Enter to send
           </div>
         </div>

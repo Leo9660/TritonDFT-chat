@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImageIcon, SendIcon, SquareIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/lib/utils";
 
 interface Props {
   value: string;
@@ -16,6 +15,7 @@ interface Props {
 export function ChatInput({ value, onChange, onSend, onStop, isStreaming }: Props) {
   const { t } = useTranslation();
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -31,13 +31,23 @@ export function ChatInput({ value, onChange, onSend, onStop, isStreaming }: Prop
     }
   }
 
+  const canSend = value.trim() && !isStreaming;
+
   return (
-    <div className="flex gap-2 border rounded-2xl p-2 items-end bg-[var(--bg-elev)]" style={{ borderColor: "var(--border)" }}>
+    <div
+      className="flex gap-2 rounded-2xl p-2 items-end transition"
+      style={{
+        background: "var(--bg-1)",
+        border: focused ? "1px solid rgba(69, 119, 255, 0.5)" : "1px solid var(--border-strong)",
+        boxShadow: focused ? "0 0 0 3px rgba(69, 119, 255, 0.12)" : "none",
+      }}
+    >
       <button
         type="button"
         title={t("attachImage")}
         disabled
-        className="p-2 rounded-lg text-[var(--muted)] disabled:opacity-40 cursor-not-allowed"
+        className="p-2 rounded-lg disabled:opacity-40 cursor-not-allowed"
+        style={{ color: "var(--fg-dim)" }}
       >
         <ImageIcon size={18} />
       </button>
@@ -46,16 +56,22 @@ export function ChatInput({ value, onChange, onSend, onStop, isStreaming }: Prop
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKey}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         rows={1}
         placeholder={t("placeholder")}
         className="flex-1 resize-none bg-transparent outline-none px-2 py-2 max-h-60"
+        style={{ color: "var(--fg)" }}
       />
       {isStreaming ? (
         <button
           type="button"
           onClick={onStop}
           title={t("stop")}
-          className="p-2 rounded-lg bg-red-500 text-white hover:bg-red-600"
+          className="p-2 rounded-lg text-white transition"
+          style={{ background: "#ef4444" }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "#dc2626")}
+          onMouseLeave={(e) => (e.currentTarget.style.background = "#ef4444")}
         >
           <SquareIcon size={18} />
         </button>
@@ -63,12 +79,21 @@ export function ChatInput({ value, onChange, onSend, onStop, isStreaming }: Prop
         <button
           type="button"
           onClick={onSend}
-          disabled={!value.trim()}
+          disabled={!canSend}
           title={t("send")}
-          className={cn(
-            "p-2 rounded-lg text-white",
-            value.trim() ? "bg-[var(--accent)] hover:opacity-90" : "bg-gray-400 cursor-not-allowed",
-          )}
+          className="p-2 rounded-lg text-white transition"
+          style={{
+            background: canSend ? "var(--grad-primary)" : "rgba(255,255,255,0.06)",
+            color: canSend ? "white" : "var(--fg-dim)",
+            cursor: canSend ? "pointer" : "not-allowed",
+            boxShadow: canSend ? "0 6px 14px rgba(69, 119, 255, 0.3)" : "none",
+          }}
+          onMouseEnter={(e) => {
+            if (canSend) e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "";
+          }}
         >
           <SendIcon size={18} />
         </button>
