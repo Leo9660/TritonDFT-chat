@@ -1,12 +1,10 @@
 import type { NextConfig } from "next";
 
-const isProd = process.env.NODE_ENV === "production";
-const repo = "TritonDFT-frontend";
-
+// We deploy under a custom domain (tritondft.com) → serve at root.
+// No basePath needed. yil384.github.io/TritonDFT-frontend/ will be
+// auto-redirected to the custom domain by GitHub Pages.
 const nextConfig: NextConfig = {
   output: "export",
-  basePath: isProd ? `/${repo}` : "",
-  assetPrefix: isProd ? `/${repo}/` : "",
   images: { unoptimized: true },
   trailingSlash: true,
 };
