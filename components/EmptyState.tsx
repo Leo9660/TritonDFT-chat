@@ -1,12 +1,21 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface Props {
   onPrompt: (text: string) => void;
 }
 
-const STARTERS = [
+interface Starter {
+  label: string;
+  sub: string;
+  prompt: string;
+}
+
+// 12 starter prompts spanning semiconductors / metals / 2D / ionic / magnetic / heavy.
+// Each visit shows 4 randomly.
+const ALL_STARTERS: Starter[] = [
   {
     label: "Silicon",
     sub: "vc-relax · LDA",
@@ -15,9 +24,9 @@ const STARTERS = [
   },
   {
     label: "Graphene",
-    sub: "scf · PBE",
+    sub: "scf · PBE · 2D",
     prompt:
-      "Graphene 2D, scf with PBE, ecutwfc 60 Ry, k-grid 16×16×1. Report Dirac point and Fermi velocity.",
+      "Graphene 2D, scf with PBE, ecutwfc 60 Ry, k-grid 16×16×1, vacuum 15 Å. Report Dirac point and Fermi velocity.",
   },
   {
     label: "Iron",
@@ -31,15 +40,82 @@ const STARTERS = [
     prompt:
       "TiO2 rutile, band structure with PBE, ecutwfc 50 Ry. Compute band gap along Γ-X-M-R-Γ.",
   },
+  {
+    label: "Diamond",
+    sub: "C · bulk modulus",
+    prompt:
+      "Diamond cubic carbon, vc-relax with PBE, ecutwfc 80 Ry, k-grid 8×8×8. Report lattice constant and bulk modulus.",
+  },
+  {
+    label: "Copper",
+    sub: "fcc metal · workfunction",
+    prompt:
+      "Cu fcc, scf with PBE, ecutwfc 40 Ry, k-grid 12×12×12. Report cohesive energy and equilibrium lattice constant.",
+  },
+  {
+    label: "NaCl",
+    sub: "rock salt · ionic",
+    prompt:
+      "NaCl rock-salt, vc-relax with PBE, ecutwfc 50 Ry, k-grid 6×6×6. Report lattice constant and Born effective charges.",
+  },
+  {
+    label: "GaAs",
+    sub: "zinc-blende · direct gap",
+    prompt:
+      "GaAs zinc-blende, scf with PBE, ecutwfc 50 Ry, k-grid 8×8×8. Then nscf for band structure along Γ-X-L-Γ.",
+  },
+  {
+    label: "MoS₂",
+    sub: "2D TMD · monolayer",
+    prompt:
+      "MoS2 monolayer 2H, scf with PBE, ecutwfc 60 Ry, k-grid 12×12×1, vacuum 15 Å. Report band gap (direct vs indirect).",
+  },
+  {
+    label: "Aluminum",
+    sub: "fcc · phonons",
+    prompt:
+      "Al fcc, scf with PBE, ecutwfc 40 Ry, k-grid 10×10×10. Then phonon DOS via DFPT on a 4×4×4 q-grid.",
+  },
+  {
+    label: "hBN",
+    sub: "2D · wide gap",
+    prompt:
+      "Hexagonal BN monolayer, scf with PBE, ecutwfc 60 Ry, k-grid 12×12×1, vacuum 15 Å. Report band gap.",
+  },
+  {
+    label: "Germanium",
+    sub: "diamond · spin-orbit",
+    prompt:
+      "Ge diamond cubic, scf with PBE + spin-orbit, ecutwfc 40 Ry, k-grid 8×8×8. Report band gap (direct vs indirect).",
+  },
 ];
+
+function pickRandom<T>(arr: T[], n: number): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, n);
+}
 
 export function EmptyState({ onPrompt }: Props) {
   const { t } = useTranslation();
+  const [picks, setPicks] = useState<Starter[]>([]);
+
+  useEffect(() => {
+    setPicks(pickRandom(ALL_STARTERS, 4));
+  }, []);
+
+  function reshuffle() {
+    setPicks(pickRandom(ALL_STARTERS, 4));
+  }
 
   return (
     <div className="flex-1 flex items-center justify-center px-6 py-10 overflow-y-auto">
       <div className="max-w-2xl w-full text-center">
-        <div className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full text-xs tracking-widest uppercase"
+        <div
+          className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full text-xs tracking-widest uppercase"
           style={{
             fontFamily: "var(--font-mono)",
             color: "var(--amber-500, #f59e0b)",
@@ -61,12 +137,28 @@ export function EmptyState({ onPrompt }: Props) {
         >
           {t("emptyTitle")}
         </h1>
-        <p className="mb-10" style={{ color: "var(--fg-mute)", fontSize: "clamp(15px, 1.4vw, 17px)" }}>
+        <p
+          className="mb-6"
+          style={{ color: "var(--fg-mute)", fontSize: "clamp(15px, 1.4vw, 17px)" }}
+        >
           {t("emptySubtitle")}
         </p>
 
+        <div className="flex items-center justify-center gap-2 mb-4 text-xs" style={{ color: "var(--fg-dim)" }}>
+          <span>{t("starterHint")}</span>
+          <button
+            onClick={reshuffle}
+            className="underline-offset-2 transition"
+            style={{ color: "var(--fg-mute)", textDecoration: "underline", textDecorationStyle: "dotted" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--blue-500)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-mute)")}
+          >
+            {t("shuffle")}
+          </button>
+        </div>
+
         <div className="grid grid-cols-2 gap-3 text-left">
-          {STARTERS.map((s) => (
+          {picks.map((s) => (
             <button
               key={s.label}
               onClick={() => onPrompt(s.prompt)}
@@ -90,7 +182,7 @@ export function EmptyState({ onPrompt }: Props) {
               <div className="text-xs mb-2" style={{ color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}>
                 {s.sub}
               </div>
-              <div className="text-xs leading-relaxed" style={{ color: "var(--fg-mute)" }}>
+              <div className="text-xs leading-relaxed line-clamp-3" style={{ color: "var(--fg-mute)" }}>
                 {s.prompt}
               </div>
             </button>

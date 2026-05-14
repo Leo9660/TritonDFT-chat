@@ -27,6 +27,8 @@ const resources = {
       emptySubtitle:
         "Describe what you want — a material, a property, a workflow. The agent picks parameters, runs Quantum ESPRESSO, and reports back.",
       emptyHint: "⌘/Ctrl + Enter to send · localStorage history",
+      starterHint: "Try one of these — or write your own.",
+      shuffle: "Shuffle",
     },
   },
   zh: {
@@ -52,6 +54,8 @@ const resources = {
       emptySubtitle:
         "描述你想要的 —— 材料、属性、工作流。Agent 自动选参数、跑 Quantum ESPRESSO、返回结果。",
       emptyHint: "⌘/Ctrl + Enter 发送 · 对话历史存浏览器",
+      starterHint: "试一下这些 —— 或自己写一个。",
+      shuffle: "换一批",
     },
   },
 };
