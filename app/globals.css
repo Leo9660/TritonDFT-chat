@@ -386,6 +386,30 @@ html, body {
   gap: 2px;
 }
 
+.activity-run-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 6px;
+  padding-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  user-select: none;
+}
+.activity-run-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-strong);
+  opacity: 0.4;
+}
+.activity-run-divider-label {
+  opacity: 0.75;
+}
+
 .activity-row {
   position: relative;
   padding: 0 0 0 14px;

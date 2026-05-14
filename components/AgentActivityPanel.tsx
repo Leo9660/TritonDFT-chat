@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangleIcon,
@@ -30,6 +30,10 @@ interface Step {
   body: string;
   isError: boolean;
   index: number;
+  /** Which agent run this step belongs to (1-based; one run per assistant message). */
+  runIndex: number;
+  /** True for the first step in its run — used by render to draw a divider. */
+  isRunStart: boolean;
   firstSeenAt: number;
 }
 
@@ -37,23 +41,30 @@ const ERROR_TAGS = new Set(["error", "exception", "fatal"]);
 
 function parseSteps(conv: Conversation | null): Step[] {
   if (!conv) return [];
-  const last = [...conv.messages].reverse().find((m) => m.role === "assistant");
-  if (!last) return [];
+  const assistants = conv.messages.filter((m) => m.role === "assistant");
+  if (assistants.length === 0) return [];
   const out: Step[] = [];
   let i = 0;
-  for (const line of last.content.split("\n")) {
-    const m = line.match(/^\[(\w+)\]\s*(.*)$/);
-    if (m) {
-      i += 1;
-      out.push({
-        tag: m[1],
-        body: (m[2] || "").trim(),
-        isError: ERROR_TAGS.has(m[1].toLowerCase()),
-        index: i,
-        firstSeenAt: 0,
-      });
+  assistants.forEach((msg, ai) => {
+    const runIndex = ai + 1;
+    let firstInRun = true;
+    for (const line of msg.content.split("\n")) {
+      const m = line.match(/^\[(\w+)\]\s*(.*)$/);
+      if (m) {
+        i += 1;
+        out.push({
+          tag: m[1],
+          body: (m[2] || "").trim(),
+          isError: ERROR_TAGS.has(m[1].toLowerCase()),
+          index: i,
+          runIndex,
+          isRunStart: firstInRun,
+          firstSeenAt: 0,
+        });
+        firstInRun = false;
+      }
     }
-  }
+  });
   return out;
 }
 
@@ -164,14 +175,25 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
     (maxSeen - minSeen < 300) &&
     Math.abs(minSeen - mountedAtRef.current) < 1500;
 
-  const t0 = steps[0]?.firstSeenAt || 0;
-  const totalElapsedMs = steps.length
-    ? (isStreaming ? now : steps[steps.length - 1].firstSeenAt) - t0
+  /* Per-run t0 for relative timing labels (each run shows its own "+offset"). */
+  const runStartAt = new Map<number, number>();
+  steps.forEach((s) => {
+    if (!runStartAt.has(s.runIndex)) runStartAt.set(s.runIndex, s.firstSeenAt);
+  });
+
+  /* Status pill + total-elapsed reflect the LATEST run only — earlier failed
+   * runs in the same conversation shouldn't keep the panel red after a
+   * successful follow-up. */
+  const latestRunIndex = steps.length ? steps[steps.length - 1].runIndex : 0;
+  const latestSteps = steps.filter((s) => s.runIndex === latestRunIndex);
+  const latestT0 = runStartAt.get(latestRunIndex) ?? 0;
+  const totalElapsedMs = latestSteps.length
+    ? (isStreaming ? now : latestSteps[latestSteps.length - 1].firstSeenAt) - latestT0
     : 0;
 
   const lastIdx = steps.length - 1;
-  const hasError = steps.some((s) => s.isError);
-  const errorIdx = steps.findIndex((s) => s.isError);
+  const hasError = latestSteps.some((s) => s.isError);
+  const errorIdxInRun = latestSteps.findIndex((s) => s.isError);
 
   let statusText: string;
   let statusColor: string;
@@ -181,7 +203,7 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
     statusColor = "#10b981";
     StatusIcon = Loader2Icon;
   } else if (hasError) {
-    statusText = `${t("failed")} ${t("stepN")} ${errorIdx + 1}`;
+    statusText = `${t("failed")} ${t("stepN")} ${errorIdxInRun + 1}`;
     statusColor = "#ef4444";
     StatusIcon = AlertTriangleIcon;
   } else if (steps.length > 0) {
@@ -261,7 +283,8 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
               const isActive = isStreaming && i === lastIdx && !s.isError;
               const color = tagColor(s.tag);
               const TagIcon = tagIcon(s.tag, s.isError);
-              const offsetMs = s.firstSeenAt - t0;
+              const runT0 = runStartAt.get(s.runIndex) ?? s.firstSeenAt;
+              const offsetMs = s.firstSeenAt - runT0;
               const stateClass = s.isError
                 ? "is-error"
                 : isActive
@@ -269,54 +292,65 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
                   : "is-done";
               const isOpen = expanded.has(s.index) || s.isError; // errors always open
               const hasBody = (s.body || "").trim().length > 0;
+              /* Insert a divider before each follow-up run so users can see
+               * which steps belong to which prompt. Hidden for the first run. */
+              const showRunDivider = s.isRunStart && s.runIndex > 1;
 
               return (
-                <li
-                  key={`${convId}-${s.index}`}
-                  className={`activity-row ${stateClass} ${isOpen ? "is-open" : ""}`}
-                  style={
-                    {
-                      ["--accent" as string]: color,
-                    } as React.CSSProperties
-                  }
-                >
-                  <button
-                    type="button"
-                    onClick={() => hasBody && toggleExpanded(s.index)}
-                    className="activity-row-head"
-                    aria-expanded={isOpen}
-                    title={hasBody ? (isOpen ? "Collapse" : "Expand") : undefined}
-                    disabled={!hasBody}
-                  >
-                    <ChevronRightIcon
-                      size={11}
-                      className={`activity-row-chev ${isOpen ? "is-open" : ""}`}
-                      style={{ opacity: hasBody ? 1 : 0 }}
-                    />
-                    <TagIcon size={12} className="activity-row-icon" style={{ color }} />
-                    <span className="activity-row-tag" style={{ color }}>
-                      {prettyTag(s.tag)}
-                    </span>
-                    {!isOpen && hasBody && (
-                      <span className="activity-row-preview">{firstLine(s.body)}</span>
-                    )}
-                    <span className="activity-row-spacer" />
-                    {!isHistorical && (
-                      <span className="activity-row-time">
-                        {isActive
-                          ? <><Loader2Icon size={9} className="spin-slow inline-block mr-1" />{fmtDuration(now - s.firstSeenAt)}</>
-                          : i === 0
-                            ? `0ms`
-                            : `+${fmtDuration(offsetMs)}`}
+                <Fragment key={`${convId}-${s.index}`}>
+                  {showRunDivider && (
+                    <li className="activity-run-divider" aria-hidden="true">
+                      <span className="activity-run-divider-label">
+                        {t("runN", { n: s.runIndex, defaultValue: `Run ${s.runIndex}` })}
                       </span>
-                    )}
-                  </button>
-                  {isOpen && hasBody && (
-                    <div className="activity-row-text" title={s.body}>
-                      {s.body}
-                    </div>
+                    </li>
                   )}
-                </li>
+                  <li
+                    className={`activity-row ${stateClass} ${isOpen ? "is-open" : ""}`}
+                    style={
+                      {
+                        ["--accent" as string]: color,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={() => hasBody && toggleExpanded(s.index)}
+                      className="activity-row-head"
+                      aria-expanded={isOpen}
+                      title={hasBody ? (isOpen ? "Collapse" : "Expand") : undefined}
+                      disabled={!hasBody}
+                    >
+                      <ChevronRightIcon
+                        size={11}
+                        className={`activity-row-chev ${isOpen ? "is-open" : ""}`}
+                        style={{ opacity: hasBody ? 1 : 0 }}
+                      />
+                      <TagIcon size={12} className="activity-row-icon" style={{ color }} />
+                      <span className="activity-row-tag" style={{ color }}>
+                        {prettyTag(s.tag)}
+                      </span>
+                      {!isOpen && hasBody && (
+                        <span className="activity-row-preview">{firstLine(s.body)}</span>
+                      )}
+                      <span className="activity-row-spacer" />
+                      {!isHistorical && (
+                        <span className="activity-row-time">
+                          {isActive
+                            ? <><Loader2Icon size={9} className="spin-slow inline-block mr-1" />{fmtDuration(now - s.firstSeenAt)}</>
+                            : s.isRunStart
+                              ? `0ms`
+                              : `+${fmtDuration(offsetMs)}`}
+                        </span>
+                      )}
+                    </button>
+                    {isOpen && hasBody && (
+                      <div className="activity-row-text" title={s.body}>
+                        {s.body}
+                      </div>
+                    )}
+                  </li>
+                </Fragment>
               );
             })}
           </ol>

@@ -157,7 +157,6 @@ export default function Page() {
       if (!text) return;
 
       let convId = activeId;
-      let baseHistory: Message[] = active?.messages ?? [];
 
       if (!convId || (overrideText && (active?.messages.length ?? 0) === 0 && active === null)) {
         const id = nanoid(10);
@@ -171,7 +170,6 @@ export default function Page() {
         setConversations((cs) => [fresh, ...cs]);
         setActiveId(id);
         convId = id;
-        baseHistory = [];
       }
 
       const userMsg: Message = {
@@ -204,7 +202,10 @@ export default function Page() {
 
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-      const baseMsgs: Message[] = [...baseHistory, userMsg];
+      // Backend's extract_user_message only uses the latest user msg; sending
+      // history bloats the payload and trips the 2M conversation-size cap when
+      // a prior assistant turn contained large logs (e.g. MPI dumps).
+      const baseMsgs: Message[] = [userMsg];
 
       await streamChat(backendUrl, baseMsgs, ctrl.signal, {
         onDelta: (delta) => {
@@ -384,6 +385,9 @@ export default function Page() {
             onSend={() => sendMessage()}
             onStop={stopStreaming}
             isStreaming={isStreaming}
+            lastUserMessage={
+              [...(active?.messages ?? [])].reverse().find((m) => m.role === "user")?.content
+            }
           />
           <div
             className="text-center text-xs mt-1.5"

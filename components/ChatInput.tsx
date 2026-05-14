@@ -10,9 +10,11 @@ interface Props {
   onSend: () => void;
   onStop: () => void;
   isStreaming: boolean;
+  /** Most-recent user message in the active conversation — used by ArrowUp recall. */
+  lastUserMessage?: string;
 }
 
-export function ChatInput({ value, onChange, onSend, onStop, isStreaming }: Props) {
+export function ChatInput({ value, onChange, onSend, onStop, isStreaming, lastUserMessage }: Props) {
   const { t } = useTranslation();
   const ref = useRef<HTMLTextAreaElement>(null);
   const [focused, setFocused] = useState(false);
@@ -28,6 +30,19 @@ export function ChatInput({ value, onChange, onSend, onStop, isStreaming }: Prop
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       if (!isStreaming && value.trim()) onSend();
+      return;
+    }
+    // ArrowUp on empty input → recall last sent message (terminal-style).
+    if (e.key === "ArrowUp" && !value && lastUserMessage && !isStreaming) {
+      e.preventDefault();
+      onChange(lastUserMessage);
+      // Place cursor at end after React updates the value
+      requestAnimationFrame(() => {
+        const el = ref.current;
+        if (el) {
+          el.setSelectionRange(lastUserMessage.length, lastUserMessage.length);
+        }
+      });
     }
   }
 
