@@ -58,6 +58,9 @@ export function AgentRunBlock({ content, isStreaming, onRetry }: Props) {
 
       <div className="agent-run-body">
         <MessageRenderer content={content} />
+        {isStreaming && (
+          <span className="streaming-cursor" aria-hidden="true" />
+        )}
       </div>
 
       {hasFailed && (

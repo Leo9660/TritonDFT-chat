@@ -116,9 +116,6 @@ function MessageBubble({
   return (
     <div className="self-start w-full max-w-full group anim-slide-in">
       <AgentRunBlock content={message.content} isStreaming={isStreaming} onRetry={handleRetry} />
-      {isStreaming && (
-        <span className="streaming-cursor inline-block ml-1 mt-1" aria-hidden="true" />
-      )}
       {!isStreaming && message.content.length > 0 && (
         <div className="mt-1.5 ml-2 inline-flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
