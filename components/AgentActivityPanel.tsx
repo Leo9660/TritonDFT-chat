@@ -95,11 +95,19 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
 
   const seenRef = useRef<Map<string, number>>(new Map());
   const mountedAtRef = useRef<number>(Date.now());
+  const lastConvIdRef = useRef<string | undefined>(undefined);
   const convId = conversation?.id;
-  useEffect(() => {
+
+  /* React-idiomatic derived state: reset refs DURING render when convId
+   * changes. The previous useEffect-based reset ran AFTER render, so the
+   * very first render with the new convId still used the OLD mountedAt
+   * value — which made the historical-detection diff blow up to minutes,
+   * leaking "+0ms" labels for old conversations. */
+  if (lastConvIdRef.current !== convId) {
+    lastConvIdRef.current = convId;
     seenRef.current = new Map();
     mountedAtRef.current = Date.now();
-  }, [convId]);
+  }
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
