@@ -14,6 +14,8 @@ import {
   FlaskConicalIcon,
   TerminalIcon,
   SparklesIcon,
+  ChevronRightIcon,
+  PlayIcon,
 } from "lucide-react";
 import { Conversation } from "@/lib/types";
 
@@ -73,11 +75,23 @@ function tagIcon(tag: string, isError: boolean) {
   const t = tag.toLowerCase();
   if (t === "dftagent") return AtomIcon;
   if (t === "info_query" || t === "info-query") return DatabaseIcon;
-  if (t === "planner") return SparklesIcon;
-  if (t === "executor") return CpuIcon;
+  if (t === "planner" || t === "plan") return SparklesIcon;
+  if (t === "executor" || t === "solve_sub_problem" || t === "solve") return CpuIcon;
   if (t === "analyzer") return FlaskConicalIcon;
   if (t === "refiner") return SparklesIcon;
+  if (t === "run") return PlayIcon;
   return TerminalIcon;
+}
+
+function prettyTag(raw: string): string {
+  const t = raw.replace(/_/g, " ").replace(/-/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function firstLine(s: string): string {
+  if (!s) return "—";
+  const line = s.split("\n").find((l) => l.trim().length > 0) || s;
+  return line.trim();
 }
 
 function fmtDuration(ms: number): string {
@@ -92,11 +106,27 @@ function fmtDuration(ms: number): string {
 export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props) {
   const { t } = useTranslation();
   const steps = useMemo(() => parseSteps(conversation), [conversation]);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  // Reset expanded set when conversation changes
+  const convId = conversation?.id;
+  const lastConvForExpandRef = useRef<string | undefined>(undefined);
+  if (lastConvForExpandRef.current !== convId) {
+    lastConvForExpandRef.current = convId;
+    if (expanded.size > 0) setExpanded(new Set());
+  }
+
+  const toggleExpanded = (idx: number) => {
+    setExpanded((s) => {
+      const next = new Set(s);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
 
   const seenRef = useRef<Map<string, number>>(new Map());
   const mountedAtRef = useRef<number>(Date.now());
   const lastConvIdRef = useRef<string | undefined>(undefined);
-  const convId = conversation?.id;
 
   /* React-idiomatic derived state: reset refs DURING render when convId
    * changes. The previous useEffect-based reset ran AFTER render, so the
@@ -201,6 +231,24 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
         )}
       </div>
 
+      {/* Tiny progress bar — fills as steps accumulate, errors turn red */}
+      {steps.length > 0 && (
+        <div className="activity-progress-track">
+          <div
+            className="activity-progress-fill"
+            style={{
+              width: isStreaming ? "100%" : "100%",
+              background: hasError
+                ? "linear-gradient(90deg, #4577ff 0%, #ef4444 100%)"
+                : isStreaming
+                  ? "linear-gradient(90deg, #4577ff 0%, rgba(69,119,255,0.3) 100%)"
+                  : "#4577ff",
+              opacity: isStreaming ? 0.7 : 1,
+            }}
+          />
+        </div>
+      )}
+
       <div className="activity-steps-wrap">
         {steps.length === 0 ? (
           <div className="activity-empty">
@@ -219,22 +267,40 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
                 : isActive
                   ? "is-active"
                   : "is-done";
+              const isOpen = expanded.has(s.index) || s.isError; // errors always open
+              const hasBody = (s.body || "").trim().length > 0;
 
               return (
                 <li
                   key={`${convId}-${s.index}`}
-                  className={`activity-row ${stateClass}`}
+                  className={`activity-row ${stateClass} ${isOpen ? "is-open" : ""}`}
                   style={
                     {
                       ["--accent" as string]: color,
                     } as React.CSSProperties
                   }
                 >
-                  <div className="activity-row-head">
-                    <TagIcon size={13} className="activity-row-icon" style={{ color }} />
+                  <button
+                    type="button"
+                    onClick={() => hasBody && toggleExpanded(s.index)}
+                    className="activity-row-head"
+                    aria-expanded={isOpen}
+                    title={hasBody ? (isOpen ? "Collapse" : "Expand") : undefined}
+                    disabled={!hasBody}
+                  >
+                    <ChevronRightIcon
+                      size={11}
+                      className={`activity-row-chev ${isOpen ? "is-open" : ""}`}
+                      style={{ opacity: hasBody ? 1 : 0 }}
+                    />
+                    <TagIcon size={12} className="activity-row-icon" style={{ color }} />
                     <span className="activity-row-tag" style={{ color }}>
-                      {s.tag}
+                      {prettyTag(s.tag)}
                     </span>
+                    {!isOpen && hasBody && (
+                      <span className="activity-row-preview">{firstLine(s.body)}</span>
+                    )}
+                    <span className="activity-row-spacer" />
                     {!isHistorical && (
                       <span className="activity-row-time">
                         {isActive
@@ -244,10 +310,12 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
                             : `+${fmtDuration(offsetMs)}`}
                       </span>
                     )}
-                  </div>
-                  <div className="activity-row-text" title={s.body}>
-                    {s.body || "—"}
-                  </div>
+                  </button>
+                  {isOpen && hasBody && (
+                    <div className="activity-row-text" title={s.body}>
+                      {s.body}
+                    </div>
+                  )}
                 </li>
               );
             })}
