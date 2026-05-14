@@ -3,14 +3,29 @@
 import { SettingsIcon, GlobeIcon, ExternalLinkIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Lang } from "@/lib/types";
+import { ChatMenu } from "./ChatMenu";
 
 interface Props {
   lang: Lang;
   onToggleLang: () => void;
   onOpenSettings: () => void;
+  hasConversation: boolean;
+  panelOpen: boolean;
+  onTogglePanel: () => void;
+  onExport: () => void;
+  onCopy: () => Promise<void>;
 }
 
-export function TopBar({ lang, onToggleLang, onOpenSettings }: Props) {
+export function TopBar({
+  lang,
+  onToggleLang,
+  onOpenSettings,
+  hasConversation,
+  panelOpen,
+  onTogglePanel,
+  onExport,
+  onCopy,
+}: Props) {
   const { t } = useTranslation();
   return (
     <header
@@ -87,6 +102,13 @@ export function TopBar({ lang, onToggleLang, onOpenSettings }: Props) {
         >
           <SettingsIcon size={16} />
         </button>
+        <ChatMenu
+          hasConversation={hasConversation}
+          panelOpen={panelOpen}
+          onTogglePanel={onTogglePanel}
+          onExport={onExport}
+          onCopy={onCopy}
+        />
       </div>
     </header>
   );

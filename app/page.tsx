@@ -11,6 +11,7 @@ import { ChatInput } from "@/components/ChatInput";
 import { ChatMessages } from "@/components/ChatMessages";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { AgentActivityPanel } from "@/components/AgentActivityPanel";
 
 import { Conversation, Lang, Message } from "@/lib/types";
 import {
@@ -22,6 +23,7 @@ import {
   saveBackendUrl,
 } from "@/lib/storage";
 import { streamChat } from "@/lib/api";
+import { conversationToMarkdown, downloadMarkdown, copyMarkdown } from "@/lib/export";
 
 export default function Page() {
   const { i18n } = useTranslation();
@@ -34,6 +36,7 @@ export default function Page() {
   const [lang, setLang] = useState<Lang>("en");
   const [backendUrl, setBackendUrl] = useState<string>("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -202,7 +205,16 @@ export default function Page() {
         onDelete={deleteConv}
       />
       <main className="flex-1 flex flex-col min-w-0">
-        <TopBar lang={lang} onToggleLang={toggleLang} onOpenSettings={() => setSettingsOpen(true)} />
+        <TopBar
+          lang={lang}
+          onToggleLang={toggleLang}
+          onOpenSettings={() => setSettingsOpen(true)}
+          hasConversation={!!active && active.messages.length > 0}
+          panelOpen={panelOpen}
+          onTogglePanel={() => setPanelOpen((x) => !x)}
+          onExport={() => { if (active) downloadMarkdown(active); }}
+          onCopy={async () => { if (active) await copyMarkdown(active); }}
+        />
         {showEmpty ? (
           <EmptyState onPrompt={(text) => sendMessage(text)} />
         ) : (
@@ -228,6 +240,13 @@ export default function Page() {
           </div>
         </div>
       </main>
+      {panelOpen && (
+        <AgentActivityPanel
+          conversation={active}
+          isStreaming={isStreaming}
+          onClose={() => setPanelOpen(false)}
+        />
+      )}
       <SettingsDialog
         open={settingsOpen}
         backendUrl={backendUrl}
