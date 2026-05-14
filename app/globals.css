@@ -282,28 +282,27 @@ html, body {
 
 /* ============================================================
    ACTIVITY PANEL RESIZE HANDLE
+   1px visible line, 9px transparent hit-area (no dark gap on sides).
    ============================================================ */
 .resize-handle {
-  width: 6px;
+  width: 1px;
+  background: var(--border);
   cursor: col-resize;
-  background: transparent;
   position: relative;
   flex-shrink: 0;
-  transition: background .15s;
+  transition: background .15s, box-shadow .15s;
 }
 .resize-handle::before {
+  /* invisible click target extending ±4px on each side */
   content: "";
   position: absolute;
-  inset: 0 2px;
-  background: var(--border);
-  border-radius: 2px;
-  transition: background .15s;
+  inset: 0 -4px;
+  z-index: 1;
 }
-.resize-handle:hover::before {
+.resize-handle:hover,
+.resize-handle:active {
   background: var(--blue-500);
-}
-.resize-handle:active::before {
-  background: var(--blue-500);
+  box-shadow: 0 0 6px rgba(69, 119, 255, 0.6);
 }
 
 /* ============================================================

@@ -114,10 +114,17 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
     s.firstSeenAt = seenRef.current.get(k) || 0;
   });
 
+  /* Historical detection: a conversation loaded from localStorage gets all
+   * steps stamped within the same render tick. If they're all within 1500ms
+   * of the panel mount AND none of them are >300ms apart from each other,
+   * it's almost certainly a freshly-hydrated old run — hide fake timings. */
+  const minSeen = steps.length ? Math.min(...steps.map((s) => s.firstSeenAt)) : 0;
+  const maxSeen = steps.length ? Math.max(...steps.map((s) => s.firstSeenAt)) : 0;
   const isHistorical =
     !isStreaming &&
     steps.length > 0 &&
-    steps.every((s) => Math.abs(s.firstSeenAt - mountedAtRef.current) < 800);
+    (maxSeen - minSeen < 300) &&
+    Math.abs(minSeen - mountedAtRef.current) < 1500;
 
   const t0 = steps[0]?.firstSeenAt || 0;
   const totalElapsedMs = steps.length
