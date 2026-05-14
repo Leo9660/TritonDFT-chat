@@ -1,8 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CircleIcon, AlertTriangleIcon, ActivityIcon, XIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  ActivityIcon,
+  XIcon,
+  CheckIcon,
+  Loader2Icon,
+} from "lucide-react";
 import { Conversation } from "@/lib/types";
 
 interface Props {
@@ -13,21 +19,21 @@ interface Props {
 
 interface Step {
   tag: string;
-  body: string; // first ~80 chars
+  body: string;
   isError: boolean;
   index: number; // 1-based
+  firstSeenAt: number; // ms timestamp
 }
 
 const ERROR_TAGS = new Set(["error", "exception", "fatal"]);
 
-/** Parse [Tag] steps from the LAST assistant message of the conversation. */
+/** Parse [Tag] steps from the LAST assistant message. */
 function parseSteps(conv: Conversation | null): Step[] {
   if (!conv) return [];
   const lastAssistant = [...conv.messages].reverse().find((m) => m.role === "assistant");
   if (!lastAssistant) return [];
-  const content = lastAssistant.content;
+  const lines = lastAssistant.content.split("\n");
   const out: Step[] = [];
-  const lines = content.split("\n");
   let i = 0;
   for (const line of lines) {
     const m = line.match(/^\[(\w+)\]\s*(.*)$/);
@@ -35,9 +41,10 @@ function parseSteps(conv: Conversation | null): Step[] {
       i += 1;
       out.push({
         tag: m[1],
-        body: (m[2] || "").slice(0, 80),
+        body: (m[2] || "").trim(),
         isError: ERROR_TAGS.has(m[1].toLowerCase()),
         index: i,
+        firstSeenAt: 0,
       });
     }
   }
@@ -54,113 +61,186 @@ function tagColor(tag: string): string {
   if (t === "refiner") return "#a78bfa";
   if (t === "dftagent") return "#c9d8ff";
   if (t === "info_query" || t === "info-query") return "#67e8f9";
+  if (t === "system") return "#9fa5b9";
   return "#9fa5b9";
 }
 
+function relTime(ts: number, now: number, locale: string): string {
+  if (!ts) return "—";
+  const d = Math.max(0, Math.floor((now - ts) / 1000));
+  if (locale === "zh") {
+    if (d < 2) return "刚刚";
+    if (d < 60) return `${d}秒前`;
+    if (d < 3600) return `${Math.floor(d / 60)}分前`;
+    return `${Math.floor(d / 3600)}时前`;
+  }
+  if (d < 2) return "now";
+  if (d < 60) return `${d}s ago`;
+  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
+  return `${Math.floor(d / 3600)}h ago`;
+}
+
 export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props) {
-  const { t } = useTranslation();
-  const steps = useMemo(() => parseSteps(conversation), [conversation]);
-  const hasError = steps.some((s) => s.isError);
+  const { t, i18n } = useTranslation();
+  const rawSteps = useMemo(() => parseSteps(conversation), [conversation]);
+
+  // Track when each step first appeared (client-side timestamp).
+  const seenRef = useRef<Map<string, number>>(new Map());
+  const conversationId = conversation?.id;
+  // Reset memory when switching to a different conversation.
+  useEffect(() => {
+    seenRef.current = new Map();
+  }, [conversationId]);
+
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isStreaming) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [isStreaming]);
+
+  // Stamp newly-discovered steps.
+  rawSteps.forEach((s) => {
+    const key = `${conversationId}::${s.index}::${s.tag}`;
+    if (!seenRef.current.has(key)) {
+      seenRef.current.set(key, Date.now());
+    }
+    s.firstSeenAt = seenRef.current.get(key) || 0;
+  });
+
+  const steps = rawSteps;
   const lastIdx = steps.length - 1;
+  const hasError = steps.some((s) => s.isError);
+  const errorIdx = steps.findIndex((s) => s.isError);
+
+  let statusText: string;
+  let statusColor: string;
+  let StatusIcon: typeof CheckIcon = CheckIcon;
+  if (isStreaming) {
+    statusText = t("running");
+    statusColor = "#10b981";
+    StatusIcon = Loader2Icon;
+  } else if (hasError) {
+    statusText = `${t("failed")} · ${t("stepN")} ${errorIdx + 1}`;
+    statusColor = "#ef4444";
+    StatusIcon = AlertTriangleIcon;
+  } else if (steps.length > 0) {
+    statusText = t("complete");
+    statusColor = "#4577ff";
+    StatusIcon = CheckIcon;
+  } else {
+    statusText = t("idle");
+    statusColor = "#5b6178";
+    StatusIcon = ActivityIcon;
+  }
 
   return (
-    <aside
-      className="hidden lg:flex w-72 shrink-0 flex-col border-l"
-      style={{ background: "var(--bg-1)", borderColor: "var(--border)" }}
-    >
-      <header
-        className="flex items-center justify-between px-4 py-3 border-b"
-        style={{ borderColor: "var(--border)" }}
-      >
+    <aside className="hidden lg:flex w-80 shrink-0 flex-col activity-panel">
+      <header className="activity-header">
         <div className="flex items-center gap-2">
-          <ActivityIcon size={15} style={{ color: "var(--blue-500)" }} />
-          <span
-            className="text-sm"
-            style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.05em", color: "var(--fg)" }}
-          >
-            {t("activity")}
-          </span>
-          {steps.length > 0 && (
-            <span
-              className="ml-1 text-[11px] px-1.5 py-0.5 rounded-md"
-              style={{
-                fontFamily: "var(--font-mono)",
-                color: "var(--fg-mute)",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid var(--border)",
-              }}
-            >
-              {steps.length}
-            </span>
-          )}
+          <ActivityIcon size={14} className="activity-header-icon" />
+          <span className="activity-header-title">{t("activity")}</span>
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1 rounded-md transition"
-            style={{ color: "var(--fg-dim)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--fg)")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-dim)")}
-            title="Hide panel"
+            className="activity-close-btn"
+            title={t("hidePanel")}
+            aria-label={t("hidePanel")}
           >
             <XIcon size={14} />
           </button>
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto p-3">
+      {/* Status banner */}
+      <div className="activity-status-banner" style={{ borderColor: `${statusColor}55` }}>
+        <span
+          className="activity-status-icon"
+          style={{
+            color: statusColor,
+            background: `${statusColor}1a`,
+            border: `1px solid ${statusColor}55`,
+          }}
+        >
+          <StatusIcon size={14} className={isStreaming ? "spin-slow" : ""} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="activity-status-label" style={{ color: statusColor }}>
+            {statusText}
+          </div>
+          <div className="activity-status-sub">
+            {steps.length === 0
+              ? t("noStepsYet")
+              : `${steps.length} ${steps.length === 1 ? t("stepSingular") : t("stepPlural")}`}
+          </div>
+        </div>
+      </div>
+
+      {/* Steps timeline */}
+      <div className="activity-steps-wrap">
         {steps.length === 0 ? (
-          <div
-            className="text-center text-xs py-10 px-4"
-            style={{ color: "var(--fg-dim)" }}
-          >
-            {t("noActivityYet")}
+          <div className="activity-empty">
+            <ActivityIcon size={28} className="opacity-30 mb-3" />
+            <div className="activity-empty-text">{t("noActivityYet")}</div>
           </div>
         ) : (
-          <ol className="relative">
-            {/* Vertical connector line */}
-            <span
-              className="absolute left-[10px] top-2 bottom-2 w-px"
-              style={{ background: "var(--border)" }}
-              aria-hidden="true"
-            />
+          <ol className="activity-steps">
             {steps.map((s, i) => {
-              const isLastStreaming = isStreaming && i === lastIdx && !s.isError;
+              const isActive = isStreaming && i === lastIdx && !s.isError;
+              const color = tagColor(s.tag);
               return (
-                <li key={i} className="relative pl-8 pr-1 pb-3 last:pb-0">
-                  <span
-                    className="absolute left-[3px] top-[3px] w-[15px] h-[15px] rounded-full flex items-center justify-center"
-                    style={{
-                      background: "var(--bg-1)",
-                      border: `2px solid ${tagColor(s.tag)}`,
-                      boxShadow: isLastStreaming
-                        ? `0 0 0 4px ${tagColor(s.tag)}33`
-                        : "none",
-                      animation: isLastStreaming ? "pulse-live 1.4s ease-in-out infinite" : undefined,
-                    }}
-                  >
-                    {s.isError ? (
-                      <AlertTriangleIcon size={9} style={{ color: tagColor(s.tag) }} />
-                    ) : (
-                      <CircleIcon size={5} style={{ color: tagColor(s.tag), fill: tagColor(s.tag) }} />
+                <li
+                  key={`${s.index}-${s.tag}`}
+                  className={`activity-step ${s.isError ? "is-error" : ""} ${isActive ? "is-active" : ""}`}
+                >
+                  <div className="activity-step-rail">
+                    <span
+                      className="activity-step-num"
+                      style={{ color: "var(--fg-dim)" }}
+                    >
+                      {String(s.index).padStart(2, "0")}
+                    </span>
+                    <span
+                      className="activity-step-dot"
+                      style={{
+                        background: color,
+                        boxShadow: isActive
+                          ? `0 0 0 5px ${color}33, 0 0 14px ${color}aa`
+                          : `0 0 0 3px ${color}1f`,
+                      }}
+                      aria-hidden="true"
+                    >
+                      {s.isError && <AlertTriangleIcon size={10} color="#fff" strokeWidth={2.5} />}
+                    </span>
+                    {i < steps.length - 1 && (
+                      <span
+                        className="activity-step-line"
+                        style={{
+                          background: `linear-gradient(to bottom, ${color}88, ${tagColor(steps[i + 1].tag)}88)`,
+                        }}
+                      />
                     )}
-                  </span>
-                  <div
-                    className="text-[11px] font-medium mb-0.5"
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      color: tagColor(s.tag),
-                      letterSpacing: "0.02em",
-                    }}
-                  >
-                    {s.tag}
                   </div>
-                  <div
-                    className="text-[12px] leading-snug truncate"
-                    style={{ color: s.isError ? "#fca5a5" : "var(--fg-mute)" }}
-                    title={s.body}
-                  >
-                    {s.body || "—"}
+                  <div className="activity-step-body">
+                    <div
+                      className="activity-step-tag"
+                      style={{ color }}
+                    >
+                      {s.tag}
+                    </div>
+                    <div className="activity-step-text" title={s.body}>
+                      {s.body || "—"}
+                    </div>
+                    <div className="activity-step-time">
+                      {isActive ? (
+                        <span className="activity-step-time-running" style={{ color }}>
+                          {t("inProgress")}…
+                        </span>
+                      ) : (
+                        relTime(s.firstSeenAt, now, i18n.language)
+                      )}
+                    </div>
                   </div>
                 </li>
               );
@@ -168,24 +248,6 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
           </ol>
         )}
       </div>
-
-      <footer
-        className="p-3 border-t text-[11px] flex items-center justify-between"
-        style={{ borderColor: "var(--border)", color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}
-      >
-        <span>
-          {isStreaming ? (
-            <span style={{ color: "#10b981" }}>● {t("running")}</span>
-          ) : hasError ? (
-            <span style={{ color: "#ef4444" }}>● {t("failed")}</span>
-          ) : steps.length > 0 ? (
-            <span style={{ color: "var(--blue-500)" }}>● {t("complete")}</span>
-          ) : (
-            <span>— {t("idle")}</span>
-          )}
-        </span>
-        <span>{steps.length} {steps.length === 1 ? t("stepSingular") : t("stepPlural")}</span>
-      </footer>
     </aside>
   );
 }

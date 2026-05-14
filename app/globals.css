@@ -280,6 +280,185 @@ html, body {
 .agent-alert-error .agent-alert-text { color: #fecaca; }
 .agent-alert-warn .agent-alert-text { color: #fcd34d; }
 
+/* ============================================================
+   ACTIVITY PANEL (right rail)
+   ============================================================ */
+.activity-panel {
+  background:
+    radial-gradient(220px 320px at 80% -40px, rgba(69, 119, 255, 0.06), transparent 70%),
+    var(--bg-1);
+  border-left: 1px solid var(--border);
+}
+
+.activity-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.activity-header-icon { color: var(--blue-500); }
+.activity-header-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-mute);
+}
+.activity-close-btn {
+  padding: 4px;
+  border-radius: 6px;
+  color: var(--fg-dim);
+  transition: background .15s, color .15s;
+}
+.activity-close-btn:hover { color: var(--fg); background: rgba(255,255,255,0.06); }
+
+.activity-status-banner {
+  margin: 14px 16px 4px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+}
+.activity-status-icon {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.activity-status-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+.activity-status-sub {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--fg-dim);
+  margin-top: 2px;
+  letter-spacing: 0.06em;
+}
+
+.activity-steps-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 4px 18px;
+}
+.activity-empty {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center;
+  padding: 50px 24px;
+  color: var(--fg-dim);
+}
+.activity-empty-text {
+  font-size: 12.5px;
+  line-height: 1.55;
+  max-width: 220px;
+}
+
+.activity-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px;
+}
+
+.activity-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 12px;
+  padding: 8px 8px 16px;
+  border-radius: 10px;
+  transition: background .15s;
+  animation: step-slide-in .4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.activity-step:hover { background: rgba(255,255,255,0.025); }
+.activity-step.is-active {
+  background: rgba(69, 119, 255, 0.05);
+}
+.activity-step.is-error {
+  background: rgba(239, 68, 68, 0.05);
+}
+@keyframes step-slide-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.activity-step-rail {
+  position: relative;
+  display: flex; flex-direction: column; align-items: flex-end;
+  padding-top: 4px;
+}
+.activity-step-num {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  opacity: 0.8;
+}
+.activity-step-dot {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: box-shadow .25s ease;
+}
+.activity-step.is-active .activity-step-dot {
+  animation: dot-breathe 1.6s ease-in-out infinite;
+}
+@keyframes dot-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+.activity-step-line {
+  position: absolute;
+  top: 28px;
+  bottom: -14px;
+  width: 2px;
+  border-radius: 2px;
+  opacity: 0.55;
+}
+
+.activity-step-body { min-width: 0; padding-top: 2px; }
+.activity-step-tag {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+.activity-step-text {
+  font-size: 12px;
+  color: var(--fg-mute);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.activity-step.is-error .activity-step-text { color: #fca5a5; }
+.activity-step-time {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-dim);
+  letter-spacing: 0.04em;
+}
+.activity-step-time-running {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+.spin-slow { animation: spin-slow 2s linear infinite; }
+
 /* ──────────────────  ANIMATIONS  ────────────────── */
 @keyframes slide-in-up {
   from { opacity: 0; transform: translateY(10px); }
