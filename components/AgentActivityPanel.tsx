@@ -16,6 +16,7 @@ import {
   SparklesIcon,
   ChevronRightIcon,
   PlayIcon,
+  ListChecksIcon,
 } from "lucide-react";
 import { Conversation } from "@/lib/types";
 
@@ -25,59 +26,186 @@ interface Props {
   onClose?: () => void;
 }
 
-interface Step {
+const ERROR_TAGS = new Set(["error", "exception", "fatal"]);
+
+/* ─── raw [tag] body line, parsed in order ─── */
+interface RawStep {
   tag: string;
   body: string;
   isError: boolean;
-  index: number;
-  /** Which agent run this step belongs to (1-based; one run per assistant message). */
-  runIndex: number;
-  /** True for the first step in its run — used by render to draw a divider. */
-  isRunStart: boolean;
-  firstSeenAt: number;
+  rawIndex: number;     // 1-based, global across the whole conversation
+  firstSeenAt: number;  // wall-clock, filled in during render
 }
 
-const ERROR_TAGS = new Set(["error", "exception", "fatal"]);
+/* ─── phase = one high-level "block" of the activity ─── */
+type PhaseKind = "setup" | "plan" | "step";
 
-function parseSteps(conv: Conversation | null): Step[] {
-  if (!conv) return [];
+interface Phase {
+  runIndex: number;
+  phaseIndex: number;  // unique across all phases — used as key + expansion id
+  kind: PhaseKind;
+  title: string;
+  subtitle?: string;
+  steps: RawStep[];
+  hasError: boolean;
+  isRunStart: boolean;
+}
+
+/* Parse all assistant messages into raw [tag] body lines, in order, with
+ * a stable global rawIndex so per-step timestamps can be memoised. */
+function parseRawSteps(conv: Conversation | null): { steps: RawStep[]; runOf: Map<number, number> } {
+  const runOf = new Map<number, number>();
+  if (!conv) return { steps: [], runOf };
+  const out: RawStep[] = [];
+  let rawIndex = 0;
+  conv.messages.forEach((m) => {
+    if (m.role !== "assistant") return;
+  });
   const assistants = conv.messages.filter((m) => m.role === "assistant");
-  if (assistants.length === 0) return [];
-  const out: Step[] = [];
-  let i = 0;
   assistants.forEach((msg, ai) => {
     const runIndex = ai + 1;
-    let firstInRun = true;
     for (const line of msg.content.split("\n")) {
       const m = line.match(/^\[(\w+)\]\s*(.*)$/);
-      if (m) {
-        i += 1;
-        out.push({
-          tag: m[1],
-          body: (m[2] || "").trim(),
-          isError: ERROR_TAGS.has(m[1].toLowerCase()),
-          index: i,
-          runIndex,
-          isRunStart: firstInRun,
-          firstSeenAt: 0,
-        });
-        firstInRun = false;
-      }
+      if (!m) continue;
+      rawIndex += 1;
+      runOf.set(rawIndex, runIndex);
+      out.push({
+        tag: m[1],
+        body: (m[2] || "").trim(),
+        isError: ERROR_TAGS.has(m[1].toLowerCase()),
+        rawIndex,
+        firstSeenAt: 0,
+      });
     }
   });
-  return out;
+  return { steps: out, runOf };
 }
 
-function tagColor(tag: string): string {
+/* Group raw steps into high-level phases. Boundaries:
+ *   - lines before any [plan]      → "Setup"
+ *   - [plan] lines                 → "Plan"
+ *   - [run] Executing step N/M: X  → new "Step N/M — X" phase, includes all
+ *                                    following [solve_sub_problem]/[runner]/
+ *                                    [parser] lines until the next [run]
+ *                                    Executing
+ * Errors anywhere bubble up to the phase. */
+function groupIntoPhases(rawSteps: RawStep[], runOf: Map<number, number>): Phase[] {
+  const phases: Phase[] = [];
+  let phaseCounter = 0;
+  const setupByRun: Map<number, Phase> = new Map();
+  const planByRun: Map<number, Phase> = new Map();
+  const currentByRun: Map<number, Phase> = new Map();
+  const firstSeenInRun: Set<number> = new Set();
+
+  const open = (
+    runIndex: number,
+    fields: Pick<Phase, "kind" | "title" | "subtitle" | "steps" | "hasError">,
+  ): Phase => {
+    phaseCounter += 1;
+    const isRunStart = !firstSeenInRun.has(runIndex);
+    firstSeenInRun.add(runIndex);
+    const phase: Phase = {
+      runIndex,
+      phaseIndex: phaseCounter,
+      isRunStart,
+      ...fields,
+    };
+    phases.push(phase);
+    return phase;
+  };
+
+  for (const step of rawSteps) {
+    const runIndex = runOf.get(step.rawIndex) ?? 1;
+    const lt = step.tag.toLowerCase();
+
+    /* New "step" phase boundary: [run] Executing step N/M: desc */
+    if (lt === "run") {
+      const m = step.body.match(/Executing step\s+(\d+)\/(\d+)\s*:\s*(.*)/i);
+      if (m) {
+        const phase = open(runIndex, {
+          kind: "step",
+          title: m[3].trim() || `Step ${m[1]}/${m[2]}`,
+          subtitle: `Step ${m[1]}/${m[2]}`,
+          steps: [step],
+          hasError: step.isError,
+        });
+        currentByRun.set(runIndex, phase);
+        continue;
+      }
+    }
+
+    /* Plan phase: aggregate all [plan] lines in the same run. */
+    if (lt === "plan") {
+      let phase = planByRun.get(runIndex);
+      if (!phase) {
+        phase = open(runIndex, {
+          kind: "plan",
+          title: "Plan",
+          subtitle: undefined,
+          steps: [step],
+          hasError: step.isError,
+        });
+        planByRun.set(runIndex, phase);
+        currentByRun.set(runIndex, phase);
+      } else {
+        phase.steps.push(step);
+        if (step.isError) phase.hasError = true;
+      }
+      /* Pull "N steps" out of "[plan] Parsed N steps." for subtitle. */
+      const parsedMatch = step.body.match(/Parsed\s+(\d+)\s+steps?/i);
+      if (parsedMatch) phase.subtitle = `${parsedMatch[1]} steps`;
+      continue;
+    }
+
+    /* Default: append to currentByRun, or open a Setup phase. */
+    const current = currentByRun.get(runIndex);
+    if (current) {
+      current.steps.push(step);
+      if (step.isError) current.hasError = true;
+    } else {
+      let setup = setupByRun.get(runIndex);
+      if (!setup) {
+        setup = open(runIndex, {
+          kind: "setup",
+          title: "Setup",
+          subtitle: undefined,
+          steps: [step],
+          hasError: step.isError,
+        });
+        setupByRun.set(runIndex, setup);
+        currentByRun.set(runIndex, setup);
+      } else {
+        setup.steps.push(step);
+        if (step.isError) setup.hasError = true;
+      }
+    }
+  }
+  return phases;
+}
+
+function phaseIcon(p: Phase) {
+  if (p.hasError) return AlertTriangleIcon;
+  switch (p.kind) {
+    case "plan": return SparklesIcon;
+    case "step": return CpuIcon;
+    case "setup": return DatabaseIcon;
+  }
+}
+
+function tagColor(tag: string, isError: boolean): string {
+  if (isError) return "#ef4444";
   const t = tag.toLowerCase();
-  if (ERROR_TAGS.has(t)) return "#ef4444";
   if (t === "warn" || t === "warning") return "#fbbf24";
-  if (t === "planner") return "#7c9eff";
+  if (t === "planner" || t === "plan") return "#7c9eff";
   if (t === "executor") return "#fbbf24";
   if (t === "analyzer") return "#34d399";
   if (t === "refiner") return "#a78bfa";
   if (t === "dftagent") return "#c9d8ff";
-  if (t === "info_query" || t === "info-query") return "#67e8f9";
+  if (t === "info_query" || t === "info-query" || t === "mp") return "#67e8f9";
+  if (t === "runner") return "#fbbf24";
+  if (t === "parser") return "#34d399";
+  if (t === "solve_sub_problem") return "#a78bfa";
+  if (t === "run") return "#7c9eff";
   return "#9fa5b9";
 }
 
@@ -85,22 +213,19 @@ function tagIcon(tag: string, isError: boolean) {
   if (isError) return AlertTriangleIcon;
   const t = tag.toLowerCase();
   if (t === "dftagent") return AtomIcon;
-  if (t === "info_query" || t === "info-query") return DatabaseIcon;
+  if (t === "info_query" || t === "info-query" || t === "mp") return DatabaseIcon;
   if (t === "planner" || t === "plan") return SparklesIcon;
   if (t === "executor" || t === "solve_sub_problem" || t === "solve") return CpuIcon;
   if (t === "analyzer") return FlaskConicalIcon;
   if (t === "refiner") return SparklesIcon;
   if (t === "run") return PlayIcon;
+  if (t === "runner") return TerminalIcon;
+  if (t === "parser") return ListChecksIcon;
   return TerminalIcon;
 }
 
-function prettyTag(raw: string): string {
-  const t = raw.replace(/_/g, " ").replace(/-/g, " ");
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
 function firstLine(s: string): string {
-  if (!s) return "—";
+  if (!s) return "";
   const line = s.split("\n").find((l) => l.trim().length > 0) || s;
   return line.trim();
 }
@@ -116,17 +241,52 @@ function fmtDuration(ms: number): string {
 
 export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props) {
   const { t } = useTranslation();
-  const steps = useMemo(() => parseSteps(conversation), [conversation]);
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const { steps: rawSteps, runOf } = useMemo(() => parseRawSteps(conversation), [conversation]);
 
-  // Reset expanded set when conversation changes
   const convId = conversation?.id;
+
+  /* Per-rawStep timestamps (memoised by `${convId}::${rawIndex}`). */
+  const seenRef = useRef<Map<string, number>>(new Map());
+  const mountedAtRef = useRef<number>(Date.now());
+  const lastConvIdRef = useRef<string | undefined>(undefined);
+  if (lastConvIdRef.current !== convId) {
+    lastConvIdRef.current = convId;
+    seenRef.current = new Map();
+    mountedAtRef.current = Date.now();
+  }
+  rawSteps.forEach((s) => {
+    const k = `${convId}::${s.rawIndex}`;
+    if (!seenRef.current.has(k)) seenRef.current.set(k, Date.now());
+    s.firstSeenAt = seenRef.current.get(k) || 0;
+  });
+
+  /* Now that timestamps are stable, group into phases. */
+  const phases = useMemo(() => groupIntoPhases(rawSteps, runOf), [rawSteps, runOf]);
+
+  /* Historical detection identical to before — based on raw step spread. */
+  const minSeen = rawSteps.length ? Math.min(...rawSteps.map((s) => s.firstSeenAt)) : 0;
+  const maxSeen = rawSteps.length ? Math.max(...rawSteps.map((s) => s.firstSeenAt)) : 0;
+  const isHistorical =
+    !isStreaming &&
+    rawSteps.length > 0 &&
+    (maxSeen - minSeen < 300) &&
+    Math.abs(minSeen - mountedAtRef.current) < 1500;
+
+  /* Ticking clock for live "running" durations. */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isStreaming) return;
+    const i = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(i);
+  }, [isStreaming]);
+
+  /* Expansion state — by phase.phaseIndex. */
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const lastConvForExpandRef = useRef<string | undefined>(undefined);
   if (lastConvForExpandRef.current !== convId) {
     lastConvForExpandRef.current = convId;
     if (expanded.size > 0) setExpanded(new Set());
   }
-
   const toggleExpanded = (idx: number) => {
     setExpanded((s) => {
       const next = new Set(s);
@@ -135,65 +295,33 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
     });
   };
 
-  const seenRef = useRef<Map<string, number>>(new Map());
-  const mountedAtRef = useRef<number>(Date.now());
-  const lastConvIdRef = useRef<string | undefined>(undefined);
-
-  /* React-idiomatic derived state: reset refs DURING render when convId
-   * changes. The previous useEffect-based reset ran AFTER render, so the
-   * very first render with the new convId still used the OLD mountedAt
-   * value — which made the historical-detection diff blow up to minutes,
-   * leaking "+0ms" labels for old conversations. */
-  if (lastConvIdRef.current !== convId) {
-    lastConvIdRef.current = convId;
-    seenRef.current = new Map();
-    mountedAtRef.current = Date.now();
-  }
-
-  const [now, setNow] = useState(() => Date.now());
+  /* Auto-scroll: stick to bottom unless the user has scrolled away. */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef<boolean>(true);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    stickRef.current = atBottom;
+  };
+  const totalSubsteps = rawSteps.length;
   useEffect(() => {
-    if (!isStreaming) return;
-    const i = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(i);
-  }, [isStreaming]);
+    if (!stickRef.current) return;
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [totalSubsteps, isStreaming]);
 
-  steps.forEach((s) => {
-    const k = `${convId}::${s.index}`;
-    if (!seenRef.current.has(k)) seenRef.current.set(k, Date.now());
-    s.firstSeenAt = seenRef.current.get(k) || 0;
-  });
-
-  /* Historical detection: a conversation loaded from localStorage gets all
-   * steps stamped within the same render tick. If they're all within 1500ms
-   * of the panel mount AND none of them are >300ms apart from each other,
-   * it's almost certainly a freshly-hydrated old run — hide fake timings. */
-  const minSeen = steps.length ? Math.min(...steps.map((s) => s.firstSeenAt)) : 0;
-  const maxSeen = steps.length ? Math.max(...steps.map((s) => s.firstSeenAt)) : 0;
-  const isHistorical =
-    !isStreaming &&
-    steps.length > 0 &&
-    (maxSeen - minSeen < 300) &&
-    Math.abs(minSeen - mountedAtRef.current) < 1500;
-
-  /* Per-run t0 for relative timing labels (each run shows its own "+offset"). */
-  const runStartAt = new Map<number, number>();
-  steps.forEach((s) => {
-    if (!runStartAt.has(s.runIndex)) runStartAt.set(s.runIndex, s.firstSeenAt);
-  });
-
-  /* Status pill + total-elapsed reflect the LATEST run only — earlier failed
-   * runs in the same conversation shouldn't keep the panel red after a
-   * successful follow-up. */
-  const latestRunIndex = steps.length ? steps[steps.length - 1].runIndex : 0;
-  const latestSteps = steps.filter((s) => s.runIndex === latestRunIndex);
-  const latestT0 = runStartAt.get(latestRunIndex) ?? 0;
-  const totalElapsedMs = latestSteps.length
-    ? (isStreaming ? now : latestSteps[latestSteps.length - 1].firstSeenAt) - latestT0
+  /* Latest run for status pill + total elapsed. */
+  const latestRunIndex = phases.length ? phases[phases.length - 1].runIndex : 0;
+  const phasesInLatest = phases.filter((p) => p.runIndex === latestRunIndex);
+  const latestStepsInRun = phasesInLatest.flatMap((p) => p.steps);
+  const latestT0 = latestStepsInRun[0]?.firstSeenAt ?? 0;
+  const latestLast = latestStepsInRun[latestStepsInRun.length - 1]?.firstSeenAt ?? 0;
+  const totalElapsedMs = latestStepsInRun.length
+    ? (isStreaming ? now : latestLast) - latestT0
     : 0;
-
-  const lastIdx = steps.length - 1;
-  const hasError = latestSteps.some((s) => s.isError);
-  const errorIdxInRun = latestSteps.findIndex((s) => s.isError);
+  const hasError = phasesInLatest.some((p) => p.hasError);
+  const erroredPhaseIdx = phasesInLatest.findIndex((p) => p.hasError);
 
   let statusText: string;
   let statusColor: string;
@@ -203,10 +331,10 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
     statusColor = "#10b981";
     StatusIcon = Loader2Icon;
   } else if (hasError) {
-    statusText = `${t("failed")} ${t("stepN")} ${errorIdxInRun + 1}`;
+    statusText = `${t("failed")} ${t("stepN")} ${erroredPhaseIdx + 1}`;
     statusColor = "#ef4444";
     StatusIcon = AlertTriangleIcon;
-  } else if (steps.length > 0) {
+  } else if (phases.length > 0) {
     statusText = t("complete");
     statusColor = "#4577ff";
     StatusIcon = CheckIcon;
@@ -215,6 +343,8 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
     statusColor = "#5b6178";
     StatusIcon = ActivityIcon;
   }
+
+  const lastPhaseIndex = phases[phases.length - 1]?.phaseIndex;
 
   return (
     <aside className="flex w-full shrink-0 flex-col activity-panel">
@@ -235,7 +365,6 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
         )}
       </header>
 
-      {/* Compact 1-line status pill */}
       <div className="activity-status-row">
         <span
           className="activity-status-pill"
@@ -248,18 +377,17 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
           <StatusIcon size={11} className={isStreaming ? "spin-slow" : ""} />
           {statusText}
         </span>
-        {!isHistorical && steps.length > 0 && (
+        {!isHistorical && phases.length > 0 && (
           <span className="activity-total-time">{fmtDuration(totalElapsedMs)}</span>
         )}
       </div>
 
-      {/* Tiny progress bar — fills as steps accumulate, errors turn red */}
-      {steps.length > 0 && (
+      {phases.length > 0 && (
         <div className="activity-progress-track">
           <div
             className="activity-progress-fill"
             style={{
-              width: isStreaming ? "100%" : "100%",
+              width: "100%",
               background: hasError
                 ? "linear-gradient(90deg, #4577ff 0%, #ef4444 100%)"
                 : isStreaming
@@ -271,83 +399,102 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
         </div>
       )}
 
-      <div className="activity-steps-wrap">
-        {steps.length === 0 ? (
+      <div className="activity-steps-wrap" ref={scrollRef} onScroll={onScroll}>
+        {phases.length === 0 ? (
           <div className="activity-empty">
             <ActivityIcon size={26} className="opacity-30 mb-3" />
             <div className="activity-empty-text">{t("noActivityYet")}</div>
           </div>
         ) : (
-          <ol className="activity-rows">
-            {steps.map((s, i) => {
-              const isActive = isStreaming && i === lastIdx && !s.isError;
-              const color = tagColor(s.tag);
-              const TagIcon = tagIcon(s.tag, s.isError);
-              const runT0 = runStartAt.get(s.runIndex) ?? s.firstSeenAt;
-              const offsetMs = s.firstSeenAt - runT0;
-              const stateClass = s.isError
-                ? "is-error"
-                : isActive
-                  ? "is-active"
-                  : "is-done";
-              const isOpen = expanded.has(s.index) || s.isError; // errors always open
-              const hasBody = (s.body || "").trim().length > 0;
-              /* Insert a divider before each follow-up run so users can see
-               * which steps belong to which prompt. Hidden for the first run. */
-              const showRunDivider = s.isRunStart && s.runIndex > 1;
+          <ol className="activity-phases">
+            {phases.map((p) => {
+              const isLastInLatest = isStreaming && p.phaseIndex === lastPhaseIndex && !p.hasError;
+              const stateClass = p.hasError ? "is-error" : isLastInLatest ? "is-active" : "is-done";
+              const isOpen = expanded.has(p.phaseIndex) || p.hasError;
+              const PhaseIcon = phaseIcon(p);
+              const startedAt = p.steps[0]?.firstSeenAt ?? 0;
+              const endedAt = p.steps[p.steps.length - 1]?.firstSeenAt ?? 0;
+              const phaseElapsedMs = isLastInLatest ? now - startedAt : endedAt - startedAt;
+              const showRunDivider = p.isRunStart && p.runIndex > 1;
 
               return (
-                <Fragment key={`${convId}-${s.index}`}>
+                <Fragment key={`${convId}-${p.phaseIndex}`}>
                   {showRunDivider && (
                     <li className="activity-run-divider" aria-hidden="true">
                       <span className="activity-run-divider-label">
-                        {t("runN", { n: s.runIndex, defaultValue: `Run ${s.runIndex}` })}
+                        {t("runN", { n: p.runIndex, defaultValue: `Run ${p.runIndex}` })}
                       </span>
                     </li>
                   )}
-                  <li
-                    className={`activity-row ${stateClass} ${isOpen ? "is-open" : ""}`}
-                    style={
-                      {
-                        ["--accent" as string]: color,
-                      } as React.CSSProperties
-                    }
-                  >
+                  <li className={`activity-phase ${stateClass} ${isOpen ? "is-open" : ""}`}>
                     <button
                       type="button"
-                      onClick={() => hasBody && toggleExpanded(s.index)}
-                      className="activity-row-head"
+                      onClick={() => toggleExpanded(p.phaseIndex)}
+                      className="activity-phase-head"
                       aria-expanded={isOpen}
-                      title={hasBody ? (isOpen ? "Collapse" : "Expand") : undefined}
-                      disabled={!hasBody}
                     >
                       <ChevronRightIcon
                         size={11}
-                        className={`activity-row-chev ${isOpen ? "is-open" : ""}`}
-                        style={{ opacity: hasBody ? 1 : 0 }}
+                        className={`activity-phase-chev ${isOpen ? "is-open" : ""}`}
                       />
-                      <TagIcon size={12} className="activity-row-icon" style={{ color }} />
-                      <span className="activity-row-tag" style={{ color }}>
-                        {prettyTag(s.tag)}
+                      <span className="activity-phase-status-icon">
+                        {p.hasError ? (
+                          <AlertTriangleIcon size={13} style={{ color: "#ef4444" }} />
+                        ) : isLastInLatest ? (
+                          <Loader2Icon size={13} className="spin-slow" style={{ color: "#10b981" }} />
+                        ) : (
+                          <CheckIcon size={13} style={{ color: "#4577ff" }} />
+                        )}
                       </span>
-                      {!isOpen && hasBody && (
-                        <span className="activity-row-preview">{firstLine(s.body)}</span>
+                      <PhaseIcon size={13} className="activity-phase-icon" />
+                      {p.subtitle && (
+                        <span className="activity-phase-subtitle">{p.subtitle}</span>
                       )}
-                      <span className="activity-row-spacer" />
+                      <span className="activity-phase-title" title={p.title}>
+                        {p.title}
+                      </span>
+                      <span className="activity-phase-spacer" />
                       {!isHistorical && (
-                        <span className="activity-row-time">
-                          {isActive
-                            ? <><Loader2Icon size={9} className="spin-slow inline-block mr-1" />{fmtDuration(now - s.firstSeenAt)}</>
-                            : s.isRunStart
-                              ? `0ms`
-                              : `+${fmtDuration(offsetMs)}`}
+                        <span className="activity-phase-time">
+                          {fmtDuration(phaseElapsedMs)}
                         </span>
                       )}
                     </button>
-                    {isOpen && hasBody && (
-                      <div className="activity-row-text" title={s.body}>
-                        {s.body}
-                      </div>
+                    {isOpen && (
+                      <ul className="activity-substeps">
+                        {p.steps.map((s) => {
+                          const offsetMs = s.firstSeenAt - startedAt;
+                          const TagIcon = tagIcon(s.tag, s.isError);
+                          const color = tagColor(s.tag, s.isError);
+                          const preview = firstLine(s.body);
+                          return (
+                            <li
+                              key={s.rawIndex}
+                              className={`activity-substep ${s.isError ? "is-error" : ""}`}
+                              style={{ ["--accent" as string]: color } as React.CSSProperties}
+                            >
+                              <TagIcon size={10} className="activity-substep-icon" style={{ color }} />
+                              <span className="activity-substep-tag" style={{ color }}>
+                                {s.tag}
+                              </span>
+                              {preview && (
+                                <span
+                                  className="activity-substep-preview"
+                                  title={s.body}
+                                >
+                                  {preview}
+                                </span>
+                              )}
+                              <span className="activity-substep-spacer" />
+                              {!isHistorical && (
+                                <span className="activity-substep-time">
+                                  +{fmtDuration(offsetMs)}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
                     )}
                   </li>
                 </Fragment>
