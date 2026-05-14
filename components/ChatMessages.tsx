@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CopyIcon, CheckIcon } from "lucide-react";
+import { CopyIcon, CheckIcon, RotateCwIcon } from "lucide-react";
 import { Message } from "@/lib/types";
 import { AgentRunBlock } from "./AgentRunBlock";
 
@@ -10,9 +10,10 @@ interface Props {
   messages: Message[];
   isStreaming: boolean;
   onRetry?: (prompt: string) => void;
+  onRegenerate?: (prompt: string) => void;
 }
 
-export function ChatMessages({ messages, isStreaming, onRetry }: Props) {
+export function ChatMessages({ messages, isStreaming, onRetry, onRegenerate }: Props) {
   const { t } = useTranslation();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -51,6 +52,7 @@ export function ChatMessages({ messages, isStreaming, onRetry }: Props) {
             isStreaming={i === lastIdx && lastIsAssistantStreaming}
             retryPrompt={promptForAssistant[i]}
             onRetry={onRetry}
+            onRegenerate={i === lastIdx ? onRegenerate : undefined}
           />
         ))}
         {lastIsEmptyAssistant && (
@@ -77,12 +79,14 @@ function MessageBubble({
   isStreaming,
   retryPrompt,
   onRetry,
+  onRegenerate,
 }: {
   message: Message;
   isLast: boolean;
   isStreaming: boolean;
   retryPrompt?: string;
   onRetry?: (prompt: string) => void;
+  onRegenerate?: (prompt: string) => void;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -116,15 +120,30 @@ function MessageBubble({
         <span className="streaming-cursor inline-block ml-1 mt-1" aria-hidden="true" />
       )}
       {!isStreaming && message.content.length > 0 && (
-        <button
-          onClick={copy}
-          className="mt-1.5 ml-2 inline-flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-          style={{ color: copied ? "var(--green-500, #10b981)" : "var(--fg-dim)" }}
-          title={copied ? t("copied") : t("copy")}
-        >
-          {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
-          {copied ? t("copied") : t("copy")}
-        </button>
+        <div className="mt-1.5 ml-2 inline-flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={copy}
+            className="inline-flex items-center gap-1 text-xs"
+            style={{ color: copied ? "var(--green-500, #10b981)" : "var(--fg-dim)" }}
+            title={copied ? t("copied") : t("copy")}
+          >
+            {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
+            {copied ? t("copied") : t("copy")}
+          </button>
+          {onRegenerate && retryPrompt && (
+            <button
+              onClick={() => onRegenerate(retryPrompt)}
+              className="inline-flex items-center gap-1 text-xs transition"
+              style={{ color: "var(--fg-dim)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--blue-500)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--fg-dim)")}
+              title={t("regenerate")}
+            >
+              <RotateCwIcon size={12} />
+              {t("regenerate")}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

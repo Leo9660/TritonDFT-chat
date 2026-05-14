@@ -159,7 +159,7 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
   }
 
   return (
-    <aside className="hidden lg:flex w-80 shrink-0 flex-col activity-panel">
+    <aside className="flex w-full shrink-0 flex-col activity-panel">
       <header className="activity-header">
         <div className="flex items-center gap-2">
           <ActivityIcon size={14} className="activity-header-icon" />

@@ -13,6 +13,21 @@ export interface Conversation {
   messages: Message[];
   createdAt: number;
   updatedAt: number;
+  folderId?: string | null;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
+  expanded?: boolean;
+}
+
+export interface PromptTemplate {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
 }
 
 export type Lang = "en" | "zh";

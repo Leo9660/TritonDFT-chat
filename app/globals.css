@@ -281,6 +281,32 @@ html, body {
 .agent-alert-warn .agent-alert-text { color: #fcd34d; }
 
 /* ============================================================
+   ACTIVITY PANEL RESIZE HANDLE
+   ============================================================ */
+.resize-handle {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0 2px;
+  background: var(--border);
+  border-radius: 2px;
+  transition: background .15s;
+}
+.resize-handle:hover::before {
+  background: var(--blue-500);
+}
+.resize-handle:active::before {
+  background: var(--blue-500);
+}
+
+/* ============================================================
    ACTIVITY PANEL (right rail)
    ============================================================ */
 .activity-panel {

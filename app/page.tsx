@@ -12,8 +12,9 @@ import { ChatMessages } from "@/components/ChatMessages";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { AgentActivityPanel } from "@/components/AgentActivityPanel";
+import { PromptLibrary } from "@/components/PromptLibrary";
 
-import { Conversation, Lang, Message } from "@/lib/types";
+import { Conversation, Folder, Lang, Message, PromptTemplate } from "@/lib/types";
 import {
   loadConversations,
   saveConversations,
@@ -21,45 +22,72 @@ import {
   saveLang,
   loadBackendUrl,
   saveBackendUrl,
+  loadFolders,
+  saveFolders,
+  loadPrompts,
+  savePrompts,
 } from "@/lib/storage";
 import { streamChat } from "@/lib/api";
-import { conversationToMarkdown, downloadMarkdown, copyMarkdown } from "@/lib/export";
+import { downloadMarkdown, copyMarkdown } from "@/lib/export";
+
+const ACTIVITY_WIDTH_KEY = "tritondft.activityWidth.v1";
+const ACTIVITY_MIN = 260;
+const ACTIVITY_MAX = 640;
+const ACTIVITY_DEFAULT = 320;
 
 export default function Page() {
   const { i18n } = useTranslation();
   const [hydrated, setHydrated] = useState(false);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [prompts, setPrompts] = useState<PromptTemplate[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [lang, setLang] = useState<Lang>("en");
   const [backendUrl, setBackendUrl] = useState<string>("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [promptsOpen, setPromptsOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [activityWidth, setActivityWidth] = useState<number>(ACTIVITY_DEFAULT);
 
   const abortRef = useRef<AbortController | null>(null);
 
+  // Hydrate
   useEffect(() => {
     const convs = loadConversations();
     setConversations(convs);
     setActiveId(convs[0]?.id ?? null);
+    setFolders(loadFolders());
+    setPrompts(loadPrompts());
     const lng = loadLang();
     setLang(lng);
     i18n.changeLanguage(lng);
     setBackendUrl(loadBackendUrl());
+    if (typeof window !== "undefined") {
+      const w = parseInt(localStorage.getItem(ACTIVITY_WIDTH_KEY) || "", 10);
+      if (!Number.isNaN(w) && w >= ACTIVITY_MIN && w <= ACTIVITY_MAX) setActivityWidth(w);
+    }
     setHydrated(true);
   }, [i18n]);
 
   useEffect(() => {
     if (hydrated) saveConversations(conversations);
   }, [conversations, hydrated]);
+  useEffect(() => {
+    if (hydrated) saveFolders(folders);
+  }, [folders, hydrated]);
+  useEffect(() => {
+    if (hydrated) savePrompts(prompts);
+  }, [prompts, hydrated]);
 
   const active = useMemo(
     () => conversations.find((c) => c.id === activeId) ?? null,
     [conversations, activeId],
   );
 
+  // ─── Conversation actions ───
   const newChat = useCallback(() => {
     const id = nanoid(10);
     const fresh: Conversation = {
@@ -84,8 +112,41 @@ export default function Page() {
     [activeId],
   );
 
-  // Core send: accepts an explicit prompt (used by EmptyState chips) and
-  // falls back to the live input.
+  const renameConv = useCallback((id: string, newTitle: string) => {
+    setConversations((cs) =>
+      cs.map((c) => (c.id === id ? { ...c, title: newTitle, updatedAt: Date.now() } : c)),
+    );
+  }, []);
+
+  const moveConvToFolder = useCallback((id: string, folderId: string | null) => {
+    setConversations((cs) => cs.map((c) => (c.id === id ? { ...c, folderId } : c)));
+  }, []);
+
+  // ─── Folder actions ───
+  const newFolder = useCallback(() => {
+    const id = nanoid(8);
+    setFolders((fs) => [
+      { id, name: "New folder", createdAt: Date.now(), expanded: true },
+      ...fs,
+    ]);
+  }, []);
+
+  const renameFolder = useCallback((id: string, name: string) => {
+    setFolders((fs) => fs.map((f) => (f.id === id ? { ...f, name } : f)));
+  }, []);
+
+  const deleteFolder = useCallback((id: string) => {
+    setFolders((fs) => fs.filter((f) => f.id !== id));
+    setConversations((cs) =>
+      cs.map((c) => (c.folderId === id ? { ...c, folderId: null } : c)),
+    );
+  }, []);
+
+  const toggleFolder = useCallback((id: string) => {
+    setFolders((fs) => fs.map((f) => (f.id === id ? { ...f, expanded: f.expanded === false } : f)));
+  }, []);
+
+  // ─── Send ───
   const sendMessage = useCallback(
     async (overrideText?: string) => {
       const text = (overrideText ?? input).trim();
@@ -139,7 +200,6 @@ export default function Page() {
 
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-
       const baseMsgs: Message[] = [...baseHistory, userMsg];
 
       await streamChat(backendUrl, baseMsgs, ctrl.signal, {
@@ -180,6 +240,24 @@ export default function Page() {
     [input, activeId, active, backendUrl],
   );
 
+  // Regenerate: drop the trailing assistant msg (and trailing user-only artifacts)
+  // and re-send the last user message.
+  const regenerate = useCallback(
+    (prompt: string) => {
+      if (!active) return sendMessage(prompt);
+      const msgs = [...active.messages];
+      // Pop the trailing assistant; pop the corresponding user before it.
+      if (msgs.length && msgs[msgs.length - 1].role === "assistant") msgs.pop();
+      if (msgs.length && msgs[msgs.length - 1].role === "user") msgs.pop();
+      setConversations((cs) =>
+        cs.map((c) => (c.id === active.id ? { ...c, messages: msgs } : c)),
+      );
+      // Defer to next tick so the state update lands before sendMessage reads `active.messages`.
+      setTimeout(() => sendMessage(prompt), 0);
+    },
+    [active, sendMessage],
+  );
+
   const stopStreaming = useCallback(() => abortRef.current?.abort(), []);
 
   const toggleLang = useCallback(() => {
@@ -189,9 +267,51 @@ export default function Page() {
     i18n.changeLanguage(next);
   }, [lang, i18n]);
 
-  if (!hydrated) {
-    return <div className="h-screen w-screen" />;
-  }
+  // ─── Activity panel resize ───
+  const resizingRef = useRef<{ active: boolean; startX: number; startW: number }>({
+    active: false,
+    startX: 0,
+    startW: 0,
+  });
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!resizingRef.current.active) return;
+      const delta = resizingRef.current.startX - e.clientX;
+      const next = Math.max(
+        ACTIVITY_MIN,
+        Math.min(ACTIVITY_MAX, resizingRef.current.startW + delta),
+      );
+      setActivityWidth(next);
+    }
+    function onUp() {
+      if (!resizingRef.current.active) return;
+      resizingRef.current.active = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem(ACTIVITY_WIDTH_KEY, String(activityWidth));
+      } catch {}
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, [activityWidth]);
+
+  const startResize = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      resizingRef.current = { active: true, startX: e.clientX, startW: activityWidth };
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [activityWidth],
+  );
+
+  if (!hydrated) return <div className="h-screen w-screen" />;
 
   const showEmpty = !active || active.messages.length === 0;
 
@@ -199,10 +319,18 @@ export default function Page() {
     <div className="flex h-screen w-screen overflow-hidden">
       <Sidebar
         conversations={conversations}
+        folders={folders}
         activeId={activeId}
         onSelect={setActiveId}
         onNew={newChat}
         onDelete={deleteConv}
+        onRename={renameConv}
+        onMoveToFolder={moveConvToFolder}
+        onNewFolder={newFolder}
+        onRenameFolder={renameFolder}
+        onDeleteFolder={deleteFolder}
+        onToggleFolder={toggleFolder}
+        onOpenPrompts={() => setPromptsOpen(true)}
       />
       <main className="flex-1 flex flex-col min-w-0">
         <TopBar
@@ -222,6 +350,7 @@ export default function Page() {
             messages={active!.messages}
             isStreaming={isStreaming}
             onRetry={(prompt) => sendMessage(prompt)}
+            onRegenerate={(prompt) => regenerate(prompt)}
           />
         )}
         <div className="px-4 py-3 max-w-3xl w-full mx-auto">
@@ -241,11 +370,22 @@ export default function Page() {
         </div>
       </main>
       {panelOpen && (
-        <AgentActivityPanel
-          conversation={active}
-          isStreaming={isStreaming}
-          onClose={() => setPanelOpen(false)}
-        />
+        <>
+          {/* Drag handle */}
+          <div
+            onMouseDown={startResize}
+            className="hidden lg:block resize-handle"
+            title="Drag to resize"
+            aria-label="Resize activity panel"
+          />
+          <div style={{ width: activityWidth }} className="hidden lg:flex shrink-0">
+            <AgentActivityPanel
+              conversation={active}
+              isStreaming={isStreaming}
+              onClose={() => setPanelOpen(false)}
+            />
+          </div>
+        </>
       )}
       <SettingsDialog
         open={settingsOpen}
@@ -256,6 +396,13 @@ export default function Page() {
           saveBackendUrl(url);
           setSettingsOpen(false);
         }}
+      />
+      <PromptLibrary
+        open={promptsOpen}
+        prompts={prompts}
+        onClose={() => setPromptsOpen(false)}
+        onPick={(text) => setInput(text)}
+        onChange={setPrompts}
       />
     </div>
   );
