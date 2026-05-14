@@ -57,11 +57,12 @@ export function ChatMenu({ hasConversation, panelOpen, onTogglePanel, onExport, 
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 rounded-xl z-30 anim-slide-in py-1"
+          className="absolute right-0 top-full mt-1 rounded-xl anim-slide-in py-1"
           style={{
+            zIndex: 60,
             background: "var(--bg-1)",
             border: "1px solid var(--border-strong)",
-            boxShadow: "0 12px 28px rgba(0,0,0,0.45)",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
             minWidth: 220,
           }}
         >

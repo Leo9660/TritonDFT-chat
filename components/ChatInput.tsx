@@ -46,8 +46,12 @@ export function ChatInput({ value, onChange, onSend, onStop, isStreaming }: Prop
         type="button"
         title={t("attachImage")}
         disabled
-        className="p-2 rounded-lg disabled:opacity-40 cursor-not-allowed"
-        style={{ color: "var(--fg-dim)" }}
+        className="rounded-lg disabled:opacity-40 cursor-not-allowed flex-shrink-0 inline-flex items-center justify-center"
+        style={{
+          color: "var(--fg-dim)",
+          width: 38,
+          height: 38,
+        }}
       >
         <ImageIcon size={18} />
       </button>
@@ -60,16 +64,24 @@ export function ChatInput({ value, onChange, onSend, onStop, isStreaming }: Prop
         onBlur={() => setFocused(false)}
         rows={1}
         placeholder={t("placeholder")}
-        className="flex-1 resize-none bg-transparent outline-none px-2 py-2 max-h-60"
-        style={{ color: "var(--fg)" }}
+        className="flex-1 resize-none bg-transparent outline-none px-1 max-h-60"
+        style={{
+          color: "var(--fg)",
+          /* Match button height so single-line text vertically centers
+             against the side icons (no more "icon below text" mismatch). */
+          minHeight: 38,
+          lineHeight: "22px",
+          paddingTop: 8,
+          paddingBottom: 8,
+        }}
       />
       {isStreaming ? (
         <button
           type="button"
           onClick={onStop}
           title={t("stop")}
-          className="p-2 rounded-lg text-white transition"
-          style={{ background: "#ef4444" }}
+          className="rounded-lg text-white transition flex-shrink-0 inline-flex items-center justify-center"
+          style={{ background: "#ef4444", width: 38, height: 38 }}
           onMouseEnter={(e) => (e.currentTarget.style.background = "#dc2626")}
           onMouseLeave={(e) => (e.currentTarget.style.background = "#ef4444")}
         >
@@ -81,12 +93,14 @@ export function ChatInput({ value, onChange, onSend, onStop, isStreaming }: Prop
           onClick={onSend}
           disabled={!canSend}
           title={t("send")}
-          className="p-2 rounded-lg text-white transition"
+          className="rounded-lg text-white transition flex-shrink-0 inline-flex items-center justify-center"
           style={{
             background: canSend ? "var(--grad-primary)" : "rgba(255,255,255,0.06)",
             color: canSend ? "white" : "var(--fg-dim)",
             cursor: canSend ? "pointer" : "not-allowed",
             boxShadow: canSend ? "0 6px 14px rgba(69, 119, 255, 0.3)" : "none",
+            width: 38,
+            height: 38,
           }}
           onMouseEnter={(e) => {
             if (canSend) e.currentTarget.style.transform = "translateY(-1px)";

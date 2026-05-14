@@ -21,18 +21,17 @@ interface Step {
   tag: string;
   body: string;
   isError: boolean;
-  index: number; // 1-based
-  firstSeenAt: number; // ms timestamp
+  index: number;
+  firstSeenAt: number;
 }
 
 const ERROR_TAGS = new Set(["error", "exception", "fatal"]);
 
-/** Parse [Tag] steps from the LAST assistant message. */
 function parseSteps(conv: Conversation | null): Step[] {
   if (!conv) return [];
-  const lastAssistant = [...conv.messages].reverse().find((m) => m.role === "assistant");
-  if (!lastAssistant) return [];
-  const lines = lastAssistant.content.split("\n");
+  const last = [...conv.messages].reverse().find((m) => m.role === "assistant");
+  if (!last) return [];
+  const lines = last.content.split("\n");
   const out: Step[] = [];
   let i = 0;
   for (const line of lines) {
@@ -70,9 +69,9 @@ function relTime(ts: number, now: number, locale: string): string {
   const d = Math.max(0, Math.floor((now - ts) / 1000));
   if (locale === "zh") {
     if (d < 2) return "刚刚";
-    if (d < 60) return `${d}秒前`;
-    if (d < 3600) return `${Math.floor(d / 60)}分前`;
-    return `${Math.floor(d / 3600)}时前`;
+    if (d < 60) return `${d}s 前`;
+    if (d < 3600) return `${Math.floor(d / 60)}m 前`;
+    return `${Math.floor(d / 3600)}h 前`;
   }
   if (d < 2) return "now";
   if (d < 60) return `${d}s ago`;
@@ -82,33 +81,28 @@ function relTime(ts: number, now: number, locale: string): string {
 
 export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props) {
   const { t, i18n } = useTranslation();
-  const rawSteps = useMemo(() => parseSteps(conversation), [conversation]);
+  const steps = useMemo(() => parseSteps(conversation), [conversation]);
 
-  // Track when each step first appeared (client-side timestamp).
+  // Track first-seen time per step (per conversation).
   const seenRef = useRef<Map<string, number>>(new Map());
-  const conversationId = conversation?.id;
-  // Reset memory when switching to a different conversation.
+  const convId = conversation?.id;
   useEffect(() => {
     seenRef.current = new Map();
-  }, [conversationId]);
+  }, [convId]);
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!isStreaming) return;
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
+    const i = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(i);
   }, [isStreaming]);
 
-  // Stamp newly-discovered steps.
-  rawSteps.forEach((s) => {
-    const key = `${conversationId}::${s.index}::${s.tag}`;
-    if (!seenRef.current.has(key)) {
-      seenRef.current.set(key, Date.now());
-    }
-    s.firstSeenAt = seenRef.current.get(key) || 0;
+  steps.forEach((s) => {
+    const k = `${convId}::${s.index}`;
+    if (!seenRef.current.has(k)) seenRef.current.set(k, Date.now());
+    s.firstSeenAt = seenRef.current.get(k) || 0;
   });
 
-  const steps = rawSteps;
   const lastIdx = steps.length - 1;
   const hasError = steps.some((s) => s.isError);
   const errorIdx = steps.findIndex((s) => s.isError);
@@ -127,7 +121,6 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
   } else if (steps.length > 0) {
     statusText = t("complete");
     statusColor = "#4577ff";
-    StatusIcon = CheckIcon;
   } else {
     statusText = t("idle");
     statusColor = "#5b6178";
@@ -177,7 +170,7 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
         </div>
       </div>
 
-      {/* Steps timeline */}
+      {/* Steps timeline — Linear/Stripe style */}
       <div className="activity-steps-wrap">
         {steps.length === 0 ? (
           <div className="activity-empty">
@@ -185,61 +178,55 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
             <div className="activity-empty-text">{t("noActivityYet")}</div>
           </div>
         ) : (
-          <ol className="activity-steps">
+          <ol className="activity-timeline">
             {steps.map((s, i) => {
               const isActive = isStreaming && i === lastIdx && !s.isError;
+              const isLast = i === lastIdx;
               const color = tagColor(s.tag);
+              const lineColor = isLast ? "transparent" : `${tagColor(steps[i + 1]?.tag || s.tag)}55`;
               return (
                 <li
-                  key={`${s.index}-${s.tag}`}
-                  className={`activity-step ${s.isError ? "is-error" : ""} ${isActive ? "is-active" : ""}`}
+                  key={`${convId}-${s.index}`}
+                  className={`activity-row ${s.isError ? "is-error" : ""} ${isActive ? "is-active" : ""}`}
                 >
-                  <div className="activity-step-rail">
-                    <span
-                      className="activity-step-num"
-                      style={{ color: "var(--fg-dim)" }}
-                    >
-                      {String(s.index).padStart(2, "0")}
-                    </span>
-                    <span
-                      className="activity-step-dot"
+                  {/* Left rail: dot + connector */}
+                  <div className="activity-row-rail">
+                    <div
+                      className="activity-row-dot"
                       style={{
                         background: color,
                         boxShadow: isActive
-                          ? `0 0 0 5px ${color}33, 0 0 14px ${color}aa`
+                          ? `0 0 0 4px ${color}33, 0 0 18px ${color}aa`
                           : `0 0 0 3px ${color}1f`,
                       }}
-                      aria-hidden="true"
                     >
-                      {s.isError && <AlertTriangleIcon size={10} color="#fff" strokeWidth={2.5} />}
-                    </span>
-                    {i < steps.length - 1 && (
-                      <span
-                        className="activity-step-line"
-                        style={{
-                          background: `linear-gradient(to bottom, ${color}88, ${tagColor(steps[i + 1].tag)}88)`,
-                        }}
+                      {s.isError && (
+                        <AlertTriangleIcon size={9} color="#fff" strokeWidth={3} />
+                      )}
+                    </div>
+                    {!isLast && (
+                      <div
+                        className="activity-row-line"
+                        style={{ background: lineColor }}
                       />
                     )}
                   </div>
-                  <div className="activity-step-body">
-                    <div
-                      className="activity-step-tag"
-                      style={{ color }}
-                    >
-                      {s.tag}
+                  {/* Right body */}
+                  <div className="activity-row-body">
+                    <div className="activity-row-head">
+                      <span className="activity-row-tag" style={{ color }}>
+                        {s.tag}
+                      </span>
+                      <span className="activity-row-time">
+                        {isActive ? (
+                          <span style={{ color }}>{t("inProgress")}…</span>
+                        ) : (
+                          relTime(s.firstSeenAt, now, i18n.language)
+                        )}
+                      </span>
                     </div>
-                    <div className="activity-step-text" title={s.body}>
+                    <div className="activity-row-text" title={s.body}>
                       {s.body || "—"}
-                    </div>
-                    <div className="activity-step-time">
-                      {isActive ? (
-                        <span className="activity-step-time-running" style={{ color }}>
-                          {t("inProgress")}…
-                        </span>
-                      ) : (
-                        relTime(s.firstSeenAt, now, i18n.language)
-                      )}
                     </div>
                   </div>
                 </li>

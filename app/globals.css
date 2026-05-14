@@ -357,81 +357,89 @@ html, body {
   max-width: 220px;
 }
 
-.activity-steps {
+/* ───── Timeline rows (Linear / Stripe style) ───── */
+.activity-timeline {
   list-style: none;
   margin: 0;
-  padding: 0 8px;
+  padding: 8px 16px 8px;
 }
 
-.activity-step {
+.activity-row {
   position: relative;
   display: grid;
-  grid-template-columns: 40px 1fr;
-  gap: 12px;
-  padding: 8px 8px 16px;
-  border-radius: 10px;
+  grid-template-columns: 22px 1fr;
+  column-gap: 12px;
+  padding: 8px 10px 8px 0;
+  border-radius: 8px;
   transition: background .15s;
   animation: step-slide-in .4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.activity-step:hover { background: rgba(255,255,255,0.025); }
-.activity-step.is-active {
-  background: rgba(69, 119, 255, 0.05);
-}
-.activity-step.is-error {
-  background: rgba(239, 68, 68, 0.05);
-}
+.activity-row:hover { background: rgba(255,255,255,0.025); }
+.activity-row.is-active { background: rgba(69, 119, 255, 0.06); }
+.activity-row.is-error { background: rgba(239, 68, 68, 0.06); }
 @keyframes step-slide-in {
-  from { opacity: 0; transform: translateX(8px); }
+  from { opacity: 0; transform: translateX(6px); }
   to { opacity: 1; transform: none; }
 }
 
-.activity-step-rail {
+.activity-row-rail {
   position: relative;
-  display: flex; flex-direction: column; align-items: flex-end;
-  padding-top: 4px;
+  display: flex;
+  justify-content: center;
+  /* Rail fills full row height so the connector can extend to next dot */
 }
-.activity-step-num {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.05em;
-  margin-bottom: 4px;
-  opacity: 0.8;
-}
-.activity-step-dot {
+.activity-row-dot {
   position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-  width: 14px; height: 14px;
+  z-index: 2;
+  margin-top: 4px;       /* aligns with first line of tag text */
+  width: 12px; height: 12px;
   border-radius: 50%;
+  flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
   transition: box-shadow .25s ease;
 }
-.activity-step.is-active .activity-step-dot {
+.activity-row.is-active .activity-row-dot {
   animation: dot-breathe 1.6s ease-in-out infinite;
 }
 @keyframes dot-breathe {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.18); }
+  50% { transform: scale(1.22); }
 }
-.activity-step-line {
+/* Connector line: positioned in the rail, extends down to the next row's dot */
+.activity-row-line {
   position: absolute;
-  top: 28px;
-  bottom: -14px;
+  top: 22px;            /* just below this row's dot */
+  bottom: -16px;        /* extend into the gap below + 8px into the next row */
+  left: 50%;
+  transform: translateX(-50%);
   width: 2px;
-  border-radius: 2px;
-  opacity: 0.55;
+  border-radius: 1px;
 }
 
-.activity-step-body { min-width: 0; padding-top: 2px; }
-.activity-step-tag {
+.activity-row-body {
+  min-width: 0;
+}
+.activity-row-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.activity-row-tag {
   font-family: var(--font-mono);
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  margin-bottom: 4px;
   line-height: 1.2;
 }
-.activity-step-text {
+.activity-row-time {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-dim);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.activity-row-text {
   font-size: 12px;
   color: var(--fg-mute);
   line-height: 1.55;
@@ -441,18 +449,7 @@ html, body {
   overflow: hidden;
   word-break: break-word;
 }
-.activity-step.is-error .activity-step-text { color: #fca5a5; }
-.activity-step-time {
-  margin-top: 6px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--fg-dim);
-  letter-spacing: 0.04em;
-}
-.activity-step-time-running {
-  font-weight: 600;
-  letter-spacing: 0.06em;
-}
+.activity-row.is-error .activity-row-text { color: #fca5a5; }
 
 @keyframes spin-slow {
   to { transform: rotate(360deg); }
