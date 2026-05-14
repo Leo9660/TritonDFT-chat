@@ -357,99 +357,109 @@ html, body {
   max-width: 220px;
 }
 
-/* ───── Timeline rows (Linear / Stripe style) ───── */
-.activity-timeline {
-  list-style: none;
-  margin: 0;
-  padding: 8px 16px 8px;
+/* ───── Section label between status and cards ───── */
+.activity-section-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  padding: 14px 18px 6px;
 }
 
-.activity-row {
+/* ───── Cards (LangSmith / GitHub Actions style) ───── */
+.activity-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activity-card {
   position: relative;
   display: grid;
-  grid-template-columns: 22px 1fr;
-  column-gap: 12px;
-  padding: 8px 10px 8px 0;
-  border-radius: 8px;
-  transition: background .15s;
-  animation: step-slide-in .4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  grid-template-columns: 32px 1fr;
+  column-gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+  transition: background .15s, border-color .15s, transform .15s;
+  animation: step-slide-in .35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.activity-row:hover { background: rgba(255,255,255,0.025); }
-.activity-row.is-active { background: rgba(69, 119, 255, 0.06); }
-.activity-row.is-error { background: rgba(239, 68, 68, 0.06); }
+.activity-card:hover { background: rgba(255,255,255,0.04); }
+.activity-card.is-active {
+  background: rgba(69, 119, 255, 0.06);
+}
+.activity-card.is-error {
+  background: rgba(239, 68, 68, 0.06);
+}
 @keyframes step-slide-in {
-  from { opacity: 0; transform: translateX(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
 
-.activity-row-rail {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  /* Rail fills full row height so the connector can extend to next dot */
-}
-.activity-row-dot {
-  position: relative;
-  z-index: 2;
-  margin-top: 4px;       /* aligns with first line of tag text */
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.activity-card-icon {
+  width: 30px; height: 30px;
+  border-radius: 8px;
   display: inline-flex; align-items: center; justify-content: center;
-  transition: box-shadow .25s ease;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
-.activity-row.is-active .activity-row-dot {
+.activity-card.is-active .activity-card-icon {
   animation: dot-breathe 1.6s ease-in-out infinite;
 }
 @keyframes dot-breathe {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.22); }
-}
-/* Connector line: positioned in the rail, extends down to the next row's dot */
-.activity-row-line {
-  position: absolute;
-  top: 22px;            /* just below this row's dot */
-  bottom: -16px;        /* extend into the gap below + 8px into the next row */
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  border-radius: 1px;
+  50% { transform: scale(1.08); }
 }
 
-.activity-row-body {
-  min-width: 0;
-}
-.activity-row-head {
+.activity-card-body { min-width: 0; }
+.activity-card-head {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: 8px;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
-.activity-row-tag {
+.activity-card-tag {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   line-height: 1.2;
 }
-.activity-row-time {
+.activity-card-time {
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--fg-dim);
   letter-spacing: 0.04em;
   flex-shrink: 0;
   white-space: nowrap;
+  display: inline-flex; align-items: center;
 }
-.activity-row-text {
+.activity-card-text {
   font-size: 12px;
   color: var(--fg-mute);
-  line-height: 1.55;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
 }
-.activity-row.is-error .activity-row-text { color: #fca5a5; }
+.activity-card.is-error .activity-card-text { color: #fca5a5; }
+.activity-card-status {
+  display: inline-flex; align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
 
 @keyframes spin-slow {
   to { transform: rotate(360deg); }
