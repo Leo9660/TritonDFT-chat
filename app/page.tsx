@@ -29,6 +29,8 @@ import {
 } from "@/lib/storage";
 import { streamChat } from "@/lib/api";
 import { downloadMarkdown, copyMarkdown } from "@/lib/export";
+import { useAuth } from "@/lib/auth-context";
+import { LoginGate } from "@/components/LoginGate";
 
 const ACTIVITY_WIDTH_KEY = "tritondft.activityWidth.v1";
 const ACTIVITY_MIN = 260;
@@ -37,6 +39,7 @@ const ACTIVITY_DEFAULT = 320;
 
 export default function Page() {
   const { i18n } = useTranslation();
+  const auth = useAuth();
   const [hydrated, setHydrated] = useState(false);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -217,7 +220,11 @@ export default function Page() {
             ),
           );
         },
-        onDone: () => setIsStreaming(false),
+        onDone: () => {
+          setIsStreaming(false);
+          // Refresh credits after each completed run
+          auth.refresh();
+        },
         onError: (err) => {
           setConversations((cs) =>
             cs.map((c) =>
@@ -235,9 +242,16 @@ export default function Page() {
           );
           setIsStreaming(false);
         },
+        onAuthError: (status) => {
+          if (status === 401 || status === 403) {
+            // Token invalid or banned — sign out so the LoginGate appears
+            auth.signOut();
+          }
+          // For 402 (insufficient credits), the onError handler already shows the message
+        },
       });
     },
-    [input, activeId, active, backendUrl],
+    [input, activeId, active, backendUrl, auth],
   );
 
   // Regenerate: drop the trailing assistant msg (and trailing user-only artifacts)
@@ -313,10 +327,16 @@ export default function Page() {
 
   if (!hydrated) return <div className="h-screen w-screen" />;
 
+  // Auth gate: while we're checking /auth/me, show nothing; if not signed in,
+  // overlay the login modal (the chat UI stays mounted underneath so layout
+  // doesn't jump after sign-in).
+  const needsLogin = !auth.loading && !auth.signedIn;
+
   const showEmpty = !active || active.messages.length === 0;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
+      {needsLogin && <LoginGate />}
       <Sidebar
         conversations={conversations}
         folders={folders}

@@ -4,6 +4,7 @@ import { SettingsIcon, GlobeIcon, ExternalLinkIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Lang } from "@/lib/types";
 import { ChatMenu } from "./ChatMenu";
+import { UserMenu } from "./UserMenu";
 
 interface Props {
   lang: Lang;
@@ -109,6 +110,7 @@ export function TopBar({
           onExport={onExport}
           onCopy={onCopy}
         />
+        <UserMenu />
       </div>
     </header>
   );
