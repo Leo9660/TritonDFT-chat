@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { RotateCwIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { MessageRenderer } from "./MessageRenderer";
+import { AgentStream } from "./AgentStream";
 
 interface Props {
   content: string;
@@ -57,7 +57,7 @@ export function AgentRunBlock({ content, isStreaming, onRetry }: Props) {
       </header>
 
       <div className="agent-run-body">
-        <MessageRenderer content={content} />
+        <AgentStream content={content} />
         {isStreaming && (
           <span className="streaming-cursor" aria-hidden="true" />
         )}

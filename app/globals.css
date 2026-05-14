@@ -482,6 +482,66 @@ html, body {
 
 .anim-slide-in { animation: slide-in-up .35s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
+/* ────────────────── Agent stream (parsed [Tag] body lines) ────────────────── */
+.agent-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.agent-stream-md {
+  margin: 6px 0;
+}
+.agent-step {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background .15s;
+}
+.agent-step:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.agent-step.is-error {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+.agent-step-bullet {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 3px;
+}
+.agent-step-main {
+  min-width: 0;
+}
+.agent-step-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.agent-step-body {
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+}
+.agent-step.is-error .agent-step-body {
+  color: #fca5a5;
+}
+
 .streaming-cursor {
   display: inline-block;
   width: 0.5em;
