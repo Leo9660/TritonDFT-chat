@@ -4,6 +4,18 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "TritonDFT — Chat",
   description: "LLM-driven DFT computation. Describe what you want — get publication-ready results.",
+  openGraph: {
+    title: "TritonDFT — Chat",
+    description: "Describe what you want — get publication-ready DFT results.",
+    url: "https://chat.tritondft.com",
+    images: [{ url: "/logo.png", width: 256, height: 256 }],
+  },
+  twitter: {
+    card: "summary",
+    title: "TritonDFT — Chat",
+    description: "Describe what you want — get publication-ready DFT results.",
+    images: ["/logo.png"],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
