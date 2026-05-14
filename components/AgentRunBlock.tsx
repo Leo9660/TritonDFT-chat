@@ -1,42 +1,94 @@
 "use client";
 
 import { useMemo } from "react";
+import { RotateCwIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { MessageRenderer } from "./MessageRenderer";
 
 interface Props {
   content: string;
   isStreaming: boolean;
+  onRetry?: () => void;
 }
 
 /**
- * Terminal-style frame around an assistant message. The body delegates to
- * MessageRenderer (markdown + agent-tag coloring), but the surrounding chrome
- * gives the response the look of a live agent run — mac-style dots, title,
- * status pill with step counter.
+ * Terminal-style frame around an assistant message:
+ *   ┌─────────────────────────────┐
+ *   │ ●●●  tritondft.agent    pill │   ← header
+ *   ├─────────────────────────────┤
+ *   │  body (markdown + tags)     │
+ *   ├─────────────────────────────┤
+ *   │  footer (if failed)         │
+ *   └─────────────────────────────┘
+ *
+ * State pill becomes red ("Failed at step N") when the body contains an
+ * [ERROR]-class tag. Footer shows a Retry button on failure.
  */
-export function AgentRunBlock({ content, isStreaming }: Props) {
-  const stepCount = useMemo(() => {
-    const m = content.match(/^\[\w+\]/gm);
-    return m ? m.length : 0;
-  }, [content]);
+export function AgentRunBlock({ content, isStreaming, onRetry }: Props) {
+  const { t } = useTranslation();
+  const { stepCount, errorAt } = useMemo(() => parseAgentState(content), [content]);
+
+  const hasFailed = !isStreaming && errorAt > 0;
+  const labelPlural = (n: number) => `${n} step${n === 1 ? "" : "s"}`;
+
+  let statusClass = "is-done";
+  let statusText: string;
+  if (isStreaming) {
+    statusClass = "is-live";
+    statusText = `Running · ${labelPlural(stepCount)}`;
+  } else if (hasFailed) {
+    statusClass = "is-failed";
+    statusText = `Failed at step ${errorAt} / ${stepCount}`;
+  } else {
+    statusText = `Complete · ${labelPlural(stepCount)}`;
+  }
 
   return (
-    <div className="agent-run">
+    <div className={`agent-run ${hasFailed ? "is-failed" : ""}`}>
       <header className="agent-run-header">
         <div className="agent-run-dots" aria-hidden="true">
           <span /><span /><span />
         </div>
         <div className="agent-run-title">tritondft.agent</div>
-        <div className={`agent-run-status ${isStreaming ? "is-live" : "is-done"}`}>
+        <div className={`agent-run-status ${statusClass}`}>
           <span className="agent-run-status-dot" aria-hidden="true" />
-          {isStreaming
-            ? `Running · ${stepCount} step${stepCount === 1 ? "" : "s"}`
-            : `Complete · ${stepCount} step${stepCount === 1 ? "" : "s"}`}
+          {statusText}
         </div>
       </header>
+
       <div className="agent-run-body">
         <MessageRenderer content={content} />
       </div>
+
+      {hasFailed && (
+        <footer className="agent-run-footer">
+          <div className="agent-run-footer-text">
+            {t("agentFailedHint")}
+          </div>
+          {onRetry && (
+            <button className="agent-run-retry" onClick={onRetry} type="button">
+              <RotateCwIcon size={13} />
+              {t("retry")}
+            </button>
+          )}
+        </footer>
+      )}
     </div>
   );
+}
+
+function parseAgentState(content: string): { stepCount: number; errorAt: number } {
+  // Count "[Tag]" appearances; find the index of the first ERROR-like tag.
+  const re = /^\[(\w+)\]/gm;
+  let m: RegExpExecArray | null;
+  let count = 0;
+  let errorAt = 0;
+  while ((m = re.exec(content)) !== null) {
+    count += 1;
+    if (errorAt === 0) {
+      const t = m[1].toLowerCase();
+      if (t === "error" || t === "exception" || t === "fatal") errorAt = count;
+    }
+  }
+  return { stepCount: count, errorAt };
 }

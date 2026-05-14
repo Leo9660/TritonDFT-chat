@@ -206,7 +206,11 @@ export default function Page() {
         {showEmpty ? (
           <EmptyState onPrompt={(text) => sendMessage(text)} />
         ) : (
-          <ChatMessages messages={active!.messages} isStreaming={isStreaming} />
+          <ChatMessages
+            messages={active!.messages}
+            isStreaming={isStreaming}
+            onRetry={(prompt) => sendMessage(prompt)}
+          />
         )}
         <div className="px-4 py-3 max-w-3xl w-full mx-auto">
           <ChatInput

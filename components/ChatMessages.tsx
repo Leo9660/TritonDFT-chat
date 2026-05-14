@@ -9,9 +9,10 @@ import { AgentRunBlock } from "./AgentRunBlock";
 interface Props {
   messages: Message[];
   isStreaming: boolean;
+  onRetry?: (prompt: string) => void;
 }
 
-export function ChatMessages({ messages, isStreaming }: Props) {
+export function ChatMessages({ messages, isStreaming, onRetry }: Props) {
   const { t } = useTranslation();
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -26,6 +27,19 @@ export function ChatMessages({ messages, isStreaming }: Props) {
   const lastIsEmptyAssistant =
     isStreaming && lastMsg?.role === "assistant" && lastMsg.content.length === 0;
 
+  // Map assistant index → preceding user prompt text (for retry).
+  const promptForAssistant: Record<number, string> = {};
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].role === "assistant") {
+      for (let j = i - 1; j >= 0; j--) {
+        if (messages[j].role === "user") {
+          promptForAssistant[i] = messages[j].content;
+          break;
+        }
+      }
+    }
+  }
+
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4">
       <div className="max-w-3xl mx-auto flex flex-col gap-5">
@@ -35,6 +49,8 @@ export function ChatMessages({ messages, isStreaming }: Props) {
             message={m}
             isLast={i === lastIdx}
             isStreaming={i === lastIdx && lastIsAssistantStreaming}
+            retryPrompt={promptForAssistant[i]}
+            onRetry={onRetry}
           />
         ))}
         {lastIsEmptyAssistant && (
@@ -59,10 +75,14 @@ export function ChatMessages({ messages, isStreaming }: Props) {
 function MessageBubble({
   message,
   isStreaming,
+  retryPrompt,
+  onRetry,
 }: {
   message: Message;
   isLast: boolean;
   isStreaming: boolean;
+  retryPrompt?: string;
+  onRetry?: (prompt: string) => void;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -87,9 +107,11 @@ function MessageBubble({
     );
   }
 
+  const handleRetry = onRetry && retryPrompt ? () => onRetry(retryPrompt) : undefined;
+
   return (
     <div className="self-start w-full max-w-full group anim-slide-in">
-      <AgentRunBlock content={message.content} isStreaming={isStreaming} />
+      <AgentRunBlock content={message.content} isStreaming={isStreaming} onRetry={handleRetry} />
       {isStreaming && (
         <span className="streaming-cursor inline-block ml-1 mt-1" aria-hidden="true" />
       )}

@@ -29,6 +29,8 @@ const resources = {
       emptyHint: "⌘/Ctrl + Enter to send · localStorage history",
       starterHint: "Try one of these — or write your own.",
       shuffle: "Shuffle",
+      agentFailedHint: "The agent stopped early due to an error. External services (e.g. Materials Project API) can be transient — try again in a moment.",
+      retry: "Retry",
     },
   },
   zh: {
@@ -56,6 +58,8 @@ const resources = {
       emptyHint: "⌘/Ctrl + Enter 发送 · 对话历史存浏览器",
       starterHint: "试一下这些 —— 或自己写一个。",
       shuffle: "换一批",
+      agentFailedHint: "Agent 因报错提前结束。外部服务（如 Materials Project API）有时会临时抽风，稍后重试通常能成功。",
+      retry: "重试",
     },
   },
 };
