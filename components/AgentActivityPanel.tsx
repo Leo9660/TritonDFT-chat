@@ -23,9 +23,8 @@ interface Props {
   onClose?: () => void;
 }
 
-type Tag = string;
 interface Step {
-  tag: Tag;
+  tag: string;
   body: string;
   isError: boolean;
   index: number;
@@ -56,7 +55,7 @@ function parseSteps(conv: Conversation | null): Step[] {
   return out;
 }
 
-function tagColor(tag: Tag): string {
+function tagColor(tag: string): string {
   const t = tag.toLowerCase();
   if (ERROR_TAGS.has(t)) return "#ef4444";
   if (t === "warn" || t === "warning") return "#fbbf24";
@@ -69,8 +68,7 @@ function tagColor(tag: Tag): string {
   return "#9fa5b9";
 }
 
-/** Pick an evocative icon for each agent tag (mirrors legacy DFTAgentBlock). */
-function tagIcon(tag: Tag, isError: boolean) {
+function tagIcon(tag: string, isError: boolean) {
   if (isError) return AlertTriangleIcon;
   const t = tag.toLowerCase();
   if (t === "dftagent") return AtomIcon;
@@ -95,9 +93,6 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
   const { t } = useTranslation();
   const steps = useMemo(() => parseSteps(conversation), [conversation]);
 
-  /* Track first-seen time per step (per conversation) — used to derive
-   * elapsed offsets. For convos restored from localStorage all steps get
-   * timestamped at mount; we detect that case and skip the offsets. */
   const seenRef = useRef<Map<string, number>>(new Map());
   const mountedAtRef = useRef<number>(Date.now());
   const convId = conversation?.id;
@@ -109,8 +104,8 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!isStreaming) return;
-    const interval = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(interval);
+    const i = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(i);
   }, [isStreaming]);
 
   steps.forEach((s) => {
@@ -119,13 +114,10 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
     s.firstSeenAt = seenRef.current.get(k) || 0;
   });
 
-  /* "Historical" detection: if the conversation was already done when we
-   * mounted the panel (not streaming) AND every step's firstSeenAt is within
-   * 800ms of mount, the timestamps are artifacts of a fresh page-load. We hide
-   * the elapsed column in that case rather than showing a misleading "now". */
-  const isHistorical = !isStreaming && steps.every(
-    (s) => Math.abs(s.firstSeenAt - mountedAtRef.current) < 800
-  );
+  const isHistorical =
+    !isStreaming &&
+    steps.length > 0 &&
+    steps.every((s) => Math.abs(s.firstSeenAt - mountedAtRef.current) < 800);
 
   const t0 = steps[0]?.firstSeenAt || 0;
   const totalElapsedMs = steps.length
@@ -136,16 +128,15 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
   const hasError = steps.some((s) => s.isError);
   const errorIdx = steps.findIndex((s) => s.isError);
 
-  /* Status banner */
   let statusText: string;
   let statusColor: string;
   let StatusIcon = CheckIcon as typeof CheckIcon;
   if (isStreaming) {
-    statusText = t("running");
+    statusText = `${t("running")}…`;
     statusColor = "#10b981";
     StatusIcon = Loader2Icon;
   } else if (hasError) {
-    statusText = `${t("failed")} · ${t("stepN")} ${errorIdx + 1}`;
+    statusText = `${t("failed")} ${t("stepN")} ${errorIdx + 1}`;
     statusColor = "#ef4444";
     StatusIcon = AlertTriangleIcon;
   } else if (steps.length > 0) {
@@ -177,59 +168,37 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
         )}
       </header>
 
-      {/* Compact status pill */}
-      <div className="activity-status-banner" style={{ borderColor: `${statusColor}55` }}>
+      {/* Compact 1-line status pill */}
+      <div className="activity-status-row">
         <span
-          className="activity-status-icon"
+          className="activity-status-pill"
           style={{
             color: statusColor,
-            background: `${statusColor}1a`,
-            border: `1px solid ${statusColor}55`,
+            background: `${statusColor}10`,
+            border: `1px solid ${statusColor}40`,
           }}
         >
-          <StatusIcon size={14} className={isStreaming ? "spin-slow" : ""} />
+          <StatusIcon size={11} className={isStreaming ? "spin-slow" : ""} />
+          {statusText}
         </span>
-        <div className="flex-1 min-w-0">
-          <div className="activity-status-label" style={{ color: statusColor }}>
-            {statusText}
-          </div>
-          <div className="activity-status-sub">
-            {steps.length === 0
-              ? t("noStepsYet")
-              : isHistorical
-                ? `${steps.length} ${steps.length === 1 ? t("stepSingular") : t("stepPlural")}`
-                : `${steps.length} ${steps.length === 1 ? t("stepSingular") : t("stepPlural")} · ${fmtDuration(totalElapsedMs)}`
-            }
-          </div>
-        </div>
+        {!isHistorical && steps.length > 0 && (
+          <span className="activity-total-time">{fmtDuration(totalElapsedMs)}</span>
+        )}
       </div>
 
-      {/* Section label */}
-      {steps.length > 0 && (
-        <div className="activity-section-label">{t("steps")}</div>
-      )}
-
-      {/* Cards */}
       <div className="activity-steps-wrap">
         {steps.length === 0 ? (
           <div className="activity-empty">
-            <ActivityIcon size={28} className="opacity-30 mb-3" />
+            <ActivityIcon size={26} className="opacity-30 mb-3" />
             <div className="activity-empty-text">{t("noActivityYet")}</div>
           </div>
         ) : (
-          <ol className="activity-cards">
+          <ol className="activity-rows">
             {steps.map((s, i) => {
               const isActive = isStreaming && i === lastIdx && !s.isError;
-              const isDone = !isActive && !s.isError;
               const color = tagColor(s.tag);
               const TagIcon = tagIcon(s.tag, s.isError);
               const offsetMs = s.firstSeenAt - t0;
-
-              let StatusGlyph = CheckIcon as typeof CheckIcon;
-              if (s.isError) StatusGlyph = AlertTriangleIcon;
-              else if (isActive) StatusGlyph = Loader2Icon;
-              else if (isDone) StatusGlyph = CheckIcon;
-
               const stateClass = s.isError
                 ? "is-error"
                 : isActive
@@ -239,61 +208,30 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
               return (
                 <li
                   key={`${convId}-${s.index}`}
-                  className={`activity-card ${stateClass}`}
-                  style={{ borderColor: s.isError ? "rgba(239, 68, 68, 0.32)" : isActive ? "rgba(69, 119, 255, 0.32)" : "var(--border)" }}
+                  className={`activity-row ${stateClass}`}
+                  style={
+                    {
+                      ["--accent" as string]: color,
+                    } as React.CSSProperties
+                  }
                 >
-                  {/* Icon block */}
-                  <div
-                    className="activity-card-icon"
-                    style={{
-                      color,
-                      background: `${color}1a`,
-                      border: `1px solid ${color}40`,
-                    }}
-                  >
-                    <TagIcon size={14} strokeWidth={2} />
+                  <div className="activity-row-head">
+                    <TagIcon size={13} className="activity-row-icon" style={{ color }} />
+                    <span className="activity-row-tag" style={{ color }}>
+                      {s.tag}
+                    </span>
+                    {!isHistorical && (
+                      <span className="activity-row-time">
+                        {isActive
+                          ? <><Loader2Icon size={9} className="spin-slow inline-block mr-1" />{fmtDuration(now - s.firstSeenAt)}</>
+                          : i === 0
+                            ? `0ms`
+                            : `+${fmtDuration(offsetMs)}`}
+                      </span>
+                    )}
                   </div>
-
-                  {/* Body */}
-                  <div className="activity-card-body">
-                    <div className="activity-card-head">
-                      <span className="activity-card-tag" style={{ color }}>
-                        {s.tag}
-                      </span>
-                      {!isHistorical && (
-                        <span className="activity-card-time">
-                          {isActive ? (
-                            <Loader2Icon size={10} className="spin-slow inline-block mr-1" />
-                          ) : null}
-                          {isActive
-                            ? `${fmtDuration(now - s.firstSeenAt)}…`
-                            : i === 0
-                              ? `0ms`
-                              : `+${fmtDuration(offsetMs)}`}
-                        </span>
-                      )}
-                    </div>
-                    <div className="activity-card-text" title={s.body}>
-                      {s.body || "—"}
-                    </div>
-                    {/* Status row */}
-                    <div className="activity-card-status">
-                      <StatusGlyph
-                        size={10}
-                        strokeWidth={2.5}
-                        className={isActive ? "spin-slow" : ""}
-                        style={{
-                          color: s.isError ? "#ef4444" : isActive ? "#7c9eff" : "#10b981",
-                        }}
-                      />
-                      <span
-                        style={{
-                          color: s.isError ? "#fca5a5" : isActive ? "#7c9eff" : "var(--fg-dim)",
-                        }}
-                      >
-                        {s.isError ? t("statusFailed") : isActive ? t("statusRunning") : t("statusDone")}
-                      </span>
-                    </div>
+                  <div className="activity-row-text" title={s.body}>
+                    {s.body || "—"}
                   </div>
                 </li>
               );

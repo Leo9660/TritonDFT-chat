@@ -308,18 +308,17 @@ html, body {
 
 /* ============================================================
    ACTIVITY PANEL (right rail)
+   No own border-left — the resize handle is the divider.
    ============================================================ */
 .activity-panel {
   background:
     radial-gradient(220px 320px at 80% -40px, rgba(69, 119, 255, 0.06), transparent 70%),
     var(--bg-1);
-  border-left: 1px solid var(--border);
 }
 
 .activity-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 18px 12px;
-  border-bottom: 1px solid var(--border);
+  padding: 14px 18px 10px;
 }
 .activity-header-icon { color: var(--blue-500); }
 .activity-header-title {
@@ -338,31 +337,26 @@ html, body {
 }
 .activity-close-btn:hover { color: var(--fg); background: rgba(255,255,255,0.06); }
 
-.activity-status-banner {
-  margin: 14px 16px 4px;
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
+/* Compact 1-line status row */
+.activity-status-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  padding: 6px 18px 14px;
 }
-.activity-status-icon {
-  flex-shrink: 0;
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.activity-status-label {
-  font-size: 13.5px;
+.activity-status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
   font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
-}
-.activity-status-sub {
-  font-size: 11px;
+  letter-spacing: 0.02em;
   font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+.activity-total-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--fg-dim);
-  margin-top: 2px;
   letter-spacing: 0.06em;
 }
 
@@ -383,80 +377,66 @@ html, body {
   max-width: 220px;
 }
 
-/* ───── Section label between status and cards ───── */
-.activity-section-label {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-dim);
-  padding: 14px 18px 6px;
-}
-
-/* ───── Cards (LangSmith / GitHub Actions style) ───── */
-.activity-cards {
+/* ───── Minimal rows: left accent bar + tag + body ───── */
+.activity-rows {
   list-style: none;
   margin: 0;
-  padding: 0 14px 16px;
+  padding: 4px 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
 }
 
-.activity-card {
+.activity-row {
   position: relative;
-  display: grid;
-  grid-template-columns: 32px 1fr;
-  column-gap: 10px;
-  padding: 11px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: rgba(255,255,255,0.02);
-  transition: background .15s, border-color .15s, transform .15s;
-  animation: step-slide-in .35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  padding: 9px 8px 9px 16px;
+  border-radius: 6px;
+  transition: background .15s;
+  animation: row-slide-in .35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.activity-card:hover { background: rgba(255,255,255,0.04); }
-.activity-card.is-active {
-  background: rgba(69, 119, 255, 0.06);
+.activity-row::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 11px;
+  bottom: 11px;
+  width: 2.5px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.85;
+  transition: opacity .15s, box-shadow .15s;
 }
-.activity-card.is-error {
-  background: rgba(239, 68, 68, 0.06);
+.activity-row:hover { background: rgba(255,255,255,0.025); }
+.activity-row:hover::before { opacity: 1; }
+.activity-row.is-active::before {
+  box-shadow: 0 0 14px var(--accent);
+  animation: bar-pulse 1.8s ease-in-out infinite;
 }
-@keyframes step-slide-in {
+@keyframes bar-pulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
+}
+.activity-row.is-error { background: rgba(239, 68, 68, 0.04); }
+@keyframes row-slide-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
 
-.activity-card-icon {
-  width: 30px; height: 30px;
-  border-radius: 8px;
-  display: inline-flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  margin-top: 1px;
+.activity-row-head {
+  display: flex; align-items: center;
+  gap: 7px;
+  margin-bottom: 3px;
 }
-.activity-card.is-active .activity-card-icon {
-  animation: dot-breathe 1.6s ease-in-out infinite;
-}
-@keyframes dot-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.08); }
-}
-
-.activity-card-body { min-width: 0; }
-.activity-card-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-.activity-card-tag {
+.activity-row-icon { flex-shrink: 0; }
+.activity-row-tag {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.2;
+  flex: 1;
 }
-.activity-card-time {
+.activity-row-time {
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--fg-dim);
@@ -465,27 +445,18 @@ html, body {
   white-space: nowrap;
   display: inline-flex; align-items: center;
 }
-.activity-card-text {
+.activity-row-text {
   font-size: 12px;
   color: var(--fg-mute);
   line-height: 1.5;
+  padding-left: 20px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
 }
-.activity-card.is-error .activity-card-text { color: #fca5a5; }
-.activity-card-status {
-  display: inline-flex; align-items: center;
-  gap: 5px;
-  margin-top: 6px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.9;
-}
+.activity-row.is-error .activity-row-text { color: #fca5a5; }
 
 @keyframes spin-slow {
   to { transform: rotate(360deg); }
