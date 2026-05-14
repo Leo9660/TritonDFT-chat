@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CopyIcon, CheckIcon } from "lucide-react";
 import { Message } from "@/lib/types";
-import { MessageRenderer } from "./MessageRenderer";
+import { AgentRunBlock } from "./AgentRunBlock";
 
 interface Props {
   messages: Message[];
@@ -88,14 +88,11 @@ function MessageBubble({
   }
 
   return (
-    <div className="self-start max-w-[92%] group anim-slide-in">
-      <div
-        className="rounded-2xl px-4 py-3 relative"
-        style={{ background: "var(--bg-1)", border: "1px solid var(--border)" }}
-      >
-        <MessageRenderer content={message.content} />
-        {isStreaming && <span className="streaming-cursor" aria-hidden="true" />}
-      </div>
+    <div className="self-start w-full max-w-full group anim-slide-in">
+      <AgentRunBlock content={message.content} isStreaming={isStreaming} />
+      {isStreaming && (
+        <span className="streaming-cursor inline-block ml-1 mt-1" aria-hidden="true" />
+      )}
       {!isStreaming && message.content.length > 0 && (
         <button
           onClick={copy}
