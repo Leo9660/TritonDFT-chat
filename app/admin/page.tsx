@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeftIcon, BanIcon, CheckCircle2Icon, InfinityIcon, PencilIcon, RefreshCwIcon, ShieldIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { authFetch } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
+import { fromThrown, parseResponseError, tr } from "@/lib/errors";
 
 interface AdminUser {
   id: string;
@@ -17,6 +19,7 @@ interface AdminUser {
 }
 
 export default function AdminPage() {
+  const { t } = useTranslation();
   const auth = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,11 +33,14 @@ export default function AdminPage() {
     setErr(null);
     try {
       const r = await authFetch("/admin/users");
-      if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+      if (!r.ok) {
+        setErr(tr(await parseResponseError(r)));
+        return;
+      }
       const data = await r.json();
       setUsers(data);
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(tr(fromThrown(e)));
     } finally {
       setLoading(false);
     }
@@ -47,7 +53,7 @@ export default function AdminPage() {
       return;
     }
     if (!auth.user?.is_admin) {
-      setErr("You are not an admin.");
+      setErr(tr({ code: "admin_required", message: "" }));
       setLoading(false);
       return;
     }
@@ -60,18 +66,21 @@ export default function AdminPage() {
         method: "PATCH",
         body: JSON.stringify(body),
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
+      if (!r.ok) {
+        alert(tr(await parseResponseError(r)));
+        return;
+      }
       const updated: AdminUser = await r.json();
       setUsers((us) => us.map((u) => (u.email === email ? { ...u, ...updated } : u)));
     } catch (e: unknown) {
-      alert(`Update failed: ${e instanceof Error ? e.message : String(e)}`);
+      alert(tr(fromThrown(e)));
     }
   }
 
   function saveEditedCredits(u: AdminUser) {
     const n = parseInt(editCredits, 10);
     if (Number.isNaN(n) || n < 0) {
-      alert("Credits must be a non-negative integer");
+      alert(t("errors.invalid_credits", "Credits must be a non-negative integer"));
       return;
     }
     setEditingEmail(null);

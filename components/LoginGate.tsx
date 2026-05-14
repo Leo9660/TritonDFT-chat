@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { requestMagicLink } from "@/lib/auth";
+import { fromThrown, tr } from "@/lib/errors";
 
 type Phase = "form" | "sent" | "error";
 
 export function LoginGate() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [phase, setPhase] = useState<Phase>("form");
   const [errMsg, setErrMsg] = useState("");
@@ -15,7 +18,7 @@ export function LoginGate() {
     e.preventDefault();
     const clean = email.trim().toLowerCase();
     if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
-      setErrMsg("Please enter a valid email address.");
+      setErrMsg(t("errors.invalid_email"));
       setPhase("error");
       return;
     }
@@ -25,8 +28,7 @@ export function LoginGate() {
       await requestMagicLink(clean);
       setPhase("sent");
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setErrMsg(msg);
+      setErrMsg(tr(fromThrown(e)));
       setPhase("error");
     } finally {
       setSubmitting(false);

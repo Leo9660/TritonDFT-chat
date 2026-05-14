@@ -1,8 +1,24 @@
 // Auth helpers: JWT storage + fetch wrapper.
 
 import { loadBackendUrl } from "./storage";
+import { parseError, ParsedError } from "./errors";
 
 const TOKEN_KEY = "tritondft.jwt.v1";
+
+/** Custom Error that carries a parsed backend error shape for UI translation. */
+export class ApiError extends Error {
+  parsed: ParsedError;
+  constructor(parsed: ParsedError) {
+    super(parsed.message || parsed.code);
+    this.name = "ApiError";
+    this.parsed = parsed;
+  }
+}
+
+async function throwParsed(resp: Response): Promise<never> {
+  const txt = await resp.text().catch(() => "");
+  throw new ApiError(parseError(resp.status, txt));
+}
 
 export interface User {
   email: string;
@@ -47,10 +63,7 @@ export async function requestMagicLink(email: string): Promise<{ ok: boolean; me
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
   });
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error(`HTTP ${resp.status}: ${txt}`);
-  }
+  if (!resp.ok) await throwParsed(resp);
   return resp.json();
 }
 
@@ -61,10 +74,7 @@ export async function verifyMagicToken(
     `${backendBase()}/auth/verify?token=${encodeURIComponent(token)}`,
     { method: "POST" },
   );
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error(`HTTP ${resp.status}: ${txt}`);
-  }
+  if (!resp.ok) await throwParsed(resp);
   return resp.json();
 }
 
@@ -76,7 +86,7 @@ export async function fetchMe(): Promise<User | null> {
     clearToken();
     return null;
   }
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  if (!resp.ok) await throwParsed(resp);
   return resp.json();
 }
 

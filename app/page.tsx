@@ -31,6 +31,7 @@ import { streamChat } from "@/lib/api";
 import { downloadMarkdown, copyMarkdown } from "@/lib/export";
 import { useAuth } from "@/lib/auth-context";
 import { LoginGate } from "@/components/LoginGate";
+import { fromThrown, tr } from "@/lib/errors";
 
 const ACTIVITY_WIDTH_KEY = "tritondft.activityWidth.v1";
 const ACTIVITY_MIN = 260;
@@ -226,6 +227,7 @@ export default function Page() {
           auth.refresh();
         },
         onError: (err) => {
+          const human = tr(fromThrown(err));
           setConversations((cs) =>
             cs.map((c) =>
               c.id === convId
@@ -233,7 +235,7 @@ export default function Page() {
                     ...c,
                     messages: c.messages.map((m, i) =>
                       i === c.messages.length - 1
-                        ? { ...m, content: m.content + `\n\n**Error:** ${err.message}` }
+                        ? { ...m, content: m.content + `\n\n> ⚠️ ${human}` }
                         : m,
                     ),
                   }
@@ -242,12 +244,14 @@ export default function Page() {
           );
           setIsStreaming(false);
         },
-        onAuthError: (status) => {
-          if (status === 401 || status === 403) {
-            // Token invalid or banned — sign out so the LoginGate appears
+        onApiError: (parsed) => {
+          // 401/403 means session is gone — sign out so the LoginGate appears.
+          if (parsed.status === 401 || parsed.status === 403) {
             auth.signOut();
           }
-          // For 402 (insufficient credits), the onError handler already shows the message
+          // Always refresh credits — the failed request may have caused a deduction
+          // refund or revealed a balance change.
+          auth.refresh();
         },
       });
     },

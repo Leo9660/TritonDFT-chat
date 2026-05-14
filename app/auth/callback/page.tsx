@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { verifyMagicToken, saveToken } from "@/lib/auth";
+import { fromThrown, tr } from "@/lib/errors";
 
 type State =
   | { kind: "loading" }
@@ -15,7 +16,7 @@ export default function AuthCallbackPage() {
     const url = new URL(window.location.href);
     const token = url.searchParams.get("token");
     if (!token) {
-      setState({ kind: "error", msg: "Missing token in URL." });
+      setState({ kind: "error", msg: tr({ code: "magic_link_invalid", message: "" }) });
       return;
     }
     (async () => {
@@ -23,13 +24,11 @@ export default function AuthCallbackPage() {
         const r = await verifyMagicToken(token);
         saveToken(r.token);
         setState({ kind: "ok", email: r.email });
-        // Redirect home after a short pause
         setTimeout(() => {
           window.location.replace("/");
         }, 800);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setState({ kind: "error", msg });
+        setState({ kind: "error", msg: tr(fromThrown(e)) });
       }
     })();
   }, []);

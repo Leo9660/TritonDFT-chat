@@ -1,12 +1,13 @@
 import { Message } from "./types";
-import { loadToken } from "./auth";
+import { ApiError, loadToken } from "./auth";
+import { parseError, ParsedError } from "./errors";
 
 export interface StreamCallbacks {
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (err: Error) => void;
-  /** Called on 401 (auth lost) or 402 (out of credits). */
-  onAuthError?: (status: number, body: string) => void;
+  /** Called on 401/402/403/413/429 etc. — receives the parsed error so the UI can show a translated message. */
+  onApiError?: (err: ParsedError) => void;
 }
 
 export async function streamChat(
@@ -30,14 +31,11 @@ export async function streamChat(
       signal,
     });
 
-    if (resp.status === 401 || resp.status === 402 || resp.status === 403) {
-      const txt = await resp.text();
-      cb.onAuthError?.(resp.status, txt);
-      throw new Error(`HTTP ${resp.status}: ${txt}`);
-    }
-
     if (!resp.ok || !resp.body) {
-      throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+      const txt = await resp.text().catch(() => "");
+      const parsed = parseError(resp.status, txt);
+      cb.onApiError?.(parsed);
+      throw new ApiError(parsed);
     }
 
     const reader = resp.body.getReader();
