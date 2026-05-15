@@ -447,18 +447,42 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
                         )}
                       </span>
                       <PhaseIcon size={13} className="activity-phase-icon" />
-                      {p.subtitle && (
-                        <span className="activity-phase-subtitle">{p.subtitle}</span>
-                      )}
-                      <span className="activity-phase-title" title={p.title}>
-                        {p.title}
-                      </span>
-                      <span className="activity-phase-spacer" />
-                      {!isHistorical && (
-                        <span className="activity-phase-time">
-                          {fmtDuration(phaseElapsedMs)}
-                        </span>
-                      )}
+                      <div className="activity-phase-body">
+                        <div className="activity-phase-line1">
+                          {p.subtitle && (
+                            <span className="activity-phase-subtitle">{p.subtitle}</span>
+                          )}
+                          <span className="activity-phase-title" title={p.title}>
+                            {p.title}
+                          </span>
+                          <span className="activity-phase-spacer" />
+                          {!isHistorical && (
+                            <span className="activity-phase-time">
+                              {fmtDuration(phaseElapsedMs)}
+                            </span>
+                          )}
+                        </div>
+                        {!isOpen && (() => {
+                          /* Latest meaningful sub-step preview — skip the
+                           * [run] step boundary itself (it just repeats the
+                           * phase title) and any empty-body lines. */
+                          const cand = [...p.steps].reverse().find(
+                            (s) => firstLine(s.body).length > 0 && s.tag.toLowerCase() !== "run",
+                          );
+                          if (!cand) return null;
+                          const color = tagColor(cand.tag, cand.isError);
+                          return (
+                            <div className="activity-phase-preview" title={cand.body}>
+                              <span className="activity-phase-preview-tag" style={{ color }}>
+                                {cand.tag}
+                              </span>
+                              <span className="activity-phase-preview-text">
+                                {firstLine(cand.body)}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </button>
                     {isOpen && (
                       <ul className="activity-substeps">
