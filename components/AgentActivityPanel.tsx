@@ -44,11 +44,38 @@ interface Phase {
   runIndex: number;
   phaseIndex: number;  // unique across all phases — used as key + expansion id
   kind: PhaseKind;
-  title: string;
+  title: string;       // distilled short label shown in the row ("SCF", "NSCF bands")
+  fullTitle: string;   // original LLM description, used as the hover tooltip
   subtitle?: string;
   steps: RawStep[];
   hasError: boolean;
   isRunStart: boolean;
+}
+
+/* Distill a long LLM-written sub-problem description into a short, one-word-ish
+ * label so it never has to truncate or wrap in the narrow activity panel.
+ * The full text stays available as a hover tooltip. */
+function distillTitle(fullDesc: string, kind: PhaseKind): string {
+  if (kind !== "step") return fullDesc;
+  const d = fullDesc.toLowerCase();
+  /* Order matters — most specific first. */
+  if (/\bvc[\s-]?relax\b/.test(d)) return "VC-relax";
+  if (/\bnscf\b.*\bband\s*(structure|gap|s)\b/.test(d) || /\bband\s*(structure|gap)\b.*\bnscf\b/.test(d)) return "NSCF bands";
+  if (/\bband\s*gap\b/.test(d)) return "Band gap";
+  if (/\bband\s*structure\b/.test(d)) return "Band structure";
+  if (/\bbands?\b/.test(d) && /\bnscf\b/.test(d)) return "NSCF bands";
+  if (/\bbands?\b/.test(d)) return "Bands";
+  if (/\bnscf\b/.test(d)) return "NSCF";
+  if (/\bscf\b/.test(d)) return "SCF";
+  if (/\bdos\b/.test(d)) return "DOS";
+  if (/\bphonon/.test(d)) return "Phonon";
+  if (/\brelax/.test(d)) return "Relax";
+  /* Fallback: drop verb prefixes ("Perform a ", "Conduct an "), keep first 3 words. */
+  const stripped = fullDesc
+    .replace(/^(perform|conduct|run|execute|do|carry out|compute|calculate)(\s+(a|an|the))?\s+/i, "")
+    .trim();
+  const words = stripped.split(/\s+/);
+  return words.slice(0, 3).join(" ");
 }
 
 /* Parse all assistant messages into raw [tag] body lines, in order, with
@@ -99,7 +126,7 @@ function groupIntoPhases(rawSteps: RawStep[], runOf: Map<number, number>): Phase
 
   const open = (
     runIndex: number,
-    fields: Pick<Phase, "kind" | "title" | "subtitle" | "steps" | "hasError">,
+    fields: Pick<Phase, "kind" | "title" | "fullTitle" | "subtitle" | "steps" | "hasError">,
   ): Phase => {
     phaseCounter += 1;
     const isRunStart = !firstSeenInRun.has(runIndex);
@@ -122,10 +149,12 @@ function groupIntoPhases(rawSteps: RawStep[], runOf: Map<number, number>): Phase
     if (lt === "run") {
       const m = step.body.match(/Executing step\s+(\d+)\/(\d+)\s*:\s*(.*)/i);
       if (m) {
+        const rawDesc = m[3].trim() || `Step ${m[1]}/${m[2]}`;
         const phase = open(runIndex, {
           kind: "step",
-          title: m[3].trim() || `Step ${m[1]}/${m[2]}`,
-          subtitle: `Step ${m[1]}/${m[2]}`,
+          title: distillTitle(rawDesc, "step"),
+          fullTitle: rawDesc,
+          subtitle: `${m[1]}/${m[2]}`,
           steps: [step],
           hasError: step.isError,
         });
@@ -141,6 +170,7 @@ function groupIntoPhases(rawSteps: RawStep[], runOf: Map<number, number>): Phase
         phase = open(runIndex, {
           kind: "plan",
           title: "Plan",
+          fullTitle: "Plan",
           subtitle: undefined,
           steps: [step],
           hasError: step.isError,
@@ -168,6 +198,7 @@ function groupIntoPhases(rawSteps: RawStep[], runOf: Map<number, number>): Phase
         setup = open(runIndex, {
           kind: "setup",
           title: "Setup",
+          fullTitle: "Setup",
           subtitle: undefined,
           steps: [step],
           hasError: step.isError,
@@ -452,7 +483,7 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
                           {p.subtitle && (
                             <span className="activity-phase-subtitle">{p.subtitle}</span>
                           )}
-                          <span className="activity-phase-title" title={p.title}>
+                          <span className="activity-phase-title" title={p.fullTitle}>
                             {p.title}
                           </span>
                           {!isHistorical && (

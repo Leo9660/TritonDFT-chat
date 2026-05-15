@@ -419,7 +419,7 @@ html, body {
 .activity-phase-head {
   width: 100%;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   padding: 8px 8px;
   background: transparent;
@@ -435,20 +435,17 @@ html, body {
 .activity-phase-head:hover { background: rgba(255,255,255,0.04); }
 .activity-phase-chev {
   flex-shrink: 0;
-  margin-top: 4px;
   color: var(--fg-dim);
   transition: transform .15s;
 }
 .activity-phase-chev.is-open { transform: rotate(90deg); }
 .activity-phase-status-icon {
   flex-shrink: 0;
-  margin-top: 1px;
   display: inline-flex; align-items: center; justify-content: center;
   width: 14px; height: 14px;
 }
 .activity-phase-icon {
   flex-shrink: 0;
-  margin-top: 2px;
   color: var(--fg-dim);
   opacity: 0.85;
 }
@@ -484,14 +481,12 @@ html, body {
   font-size: 12.5px;
   font-weight: 500;
   color: var(--fg);
-  line-height: 1.35;
-  /* Natural word-wrap — let titles like "Perform an SCF calculation with
-   * PBE functional" use the full row width and wrap to as many lines as
-   * needed. Previous line-clamp + flex combo produced premature ellipsis
-   * even when there was empty horizontal space remaining. */
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  line-height: 1.4;
+  /* Distilled short label (e.g. "SCF", "NSCF bands") — always fits one
+   * line; the full LLM description is available as a hover tooltip. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .activity-phase.is-error .activity-phase-title { color: #fca5a5; }
 .activity-phase-spacer { display: none; }
