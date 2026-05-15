@@ -485,13 +485,13 @@ html, body {
   font-weight: 500;
   color: var(--fg);
   line-height: 1.35;
-  /* Allow up to 2 lines before truncating with ellipsis so titles like
-   * "Perform an SCF calculation with PBE functional" don't get chopped
-   * down to "Perform a..." in the 320px-wide panel. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  /* Natural word-wrap — let titles like "Perform an SCF calculation with
+   * PBE functional" use the full row width and wrap to as many lines as
+   * needed. Previous line-clamp + flex combo produced premature ellipsis
+   * even when there was empty horizontal space remaining. */
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .activity-phase.is-error .activity-phase-title { color: #fca5a5; }
 .activity-phase-spacer { display: none; }

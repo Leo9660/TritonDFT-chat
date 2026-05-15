@@ -455,7 +455,6 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
                           <span className="activity-phase-title" title={p.title}>
                             {p.title}
                           </span>
-                          <span className="activity-phase-spacer" />
                           {!isHistorical && (
                             <span className="activity-phase-time">
                               {fmtDuration(phaseElapsedMs)}
