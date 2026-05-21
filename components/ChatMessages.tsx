@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { CopyIcon, CheckIcon, RotateCwIcon } from "lucide-react";
 import { Message } from "@/lib/types";
 import { AgentRunBlock } from "./AgentRunBlock";
+import { ResultsPanel } from "./ResultsPanel";
 
 interface Props {
   messages: Message[];
@@ -116,6 +117,7 @@ function MessageBubble({
   return (
     <div className="self-start w-full max-w-full group anim-slide-in">
       <AgentRunBlock content={message.content} isStreaming={isStreaming} onRetry={handleRetry} />
+      {message.jobId && !isStreaming && <ResultsPanel jobId={message.jobId} />}
       {!isStreaming && message.content.length > 0 && (
         <div className="mt-1.5 ml-2 inline-flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
           <button

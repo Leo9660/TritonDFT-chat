@@ -5,6 +5,8 @@ export interface Message {
   role: Role;
   content: string;
   createdAt: number;
+  /** Set once a DFT job finishes — used to render the results/artifacts panel. */
+  jobId?: string;
 }
 
 export interface Conversation {

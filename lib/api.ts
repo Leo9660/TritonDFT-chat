@@ -1,5 +1,5 @@
 import { Message } from "./types";
-import { ApiError, loadToken } from "./auth";
+import { ApiError, loadToken, authFetch } from "./auth";
 import { parseError, ParsedError } from "./errors";
 
 export interface JobCallbacks {
@@ -7,7 +7,8 @@ export interface JobCallbacks {
   onUpdate: (fullOutput: string) => void;
   /** Called while the job waits in queue. position 0 = next to run. */
   onQueue?: (position: number) => void;
-  onDone: () => void;
+  /** Receives the job id (or null) so the caller can render the results panel. */
+  onDone: (jobId: string | null) => void;
   onError: (err: Error) => void;
   /** 401/402/403/etc — receives the parsed error for translated UI messages. */
   onApiError?: (err: ParsedError) => void;
@@ -75,7 +76,7 @@ export function runJob(
         } else if (typeof data.output === "string") {
           cb.onUpdate(data.output);
         }
-        cb.onDone();
+        cb.onDone(jobId);
         return;
       }
       timer = setTimeout(poll, POLL_INTERVAL_MS);
@@ -117,7 +118,80 @@ export function runJob(
           headers: authHeaders(),
         }).catch(() => {});
       }
-      cb.onDone();
+      cb.onDone(jobId);
     },
   };
+}
+
+// ───── Artifacts: fetch a finished job's results & files ─────
+
+export interface JobResult {
+  material?: string;
+  task_type?: string;
+  final_energy_ry?: number;
+  final_energy_ev?: number;
+  band_gap_ev?: number;
+}
+
+export interface JobFile {
+  name: string;
+  size: number;
+  ext: string;
+  text: boolean;
+}
+
+export interface BandData {
+  bands: number[][][];   // [band][point][k, energy]
+  n_bands: number;
+  e_min: number;
+  e_max: number;
+  k_min: number;
+  k_max: number;
+}
+
+export interface JobDetail {
+  status: string;
+  result: JobResult | null;
+  has_artifacts: boolean;
+  error: string | null;
+}
+
+export async function fetchJobDetail(jobId: string): Promise<JobDetail> {
+  const r = await authFetch(`/jobs/${jobId}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+export async function fetchJobFiles(jobId: string): Promise<JobFile[]> {
+  const r = await authFetch(`/jobs/${jobId}/files`);
+  if (!r.ok) return [];
+  const d = await r.json();
+  return d.files || [];
+}
+
+export async function fetchJobBands(jobId: string): Promise<BandData | null> {
+  const r = await authFetch(`/jobs/${jobId}/bands`);
+  if (!r.ok) return null;
+  const d = await r.json();
+  return d.bands || null;
+}
+
+export async function fetchJobFileText(jobId: string, name: string): Promise<string> {
+  const r = await authFetch(`/jobs/${jobId}/files/${encodeURIComponent(name)}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.text();
+}
+
+export async function downloadJobZip(jobId: string): Promise<void> {
+  const r = await authFetch(`/jobs/${jobId}/download`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tritondft-${jobId}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -232,11 +232,27 @@ export default function Page() {
         onUpdate: (output) => {
           setAssistant(output);
         },
-        onDone: () => {
+        onDone: (jobId) => {
           setIsStreaming(false);
           jobRef.current = null;
           // Refresh credits after each completed run
           auth.refresh();
+          // Stamp the job id onto the assistant message so ChatMessages can
+          // render the results/artifacts panel below it.
+          if (jobId) {
+            setConversations((cs) =>
+              cs.map((c) =>
+                c.id === convId
+                  ? {
+                      ...c,
+                      messages: c.messages.map((m, i) =>
+                        i === c.messages.length - 1 ? { ...m, jobId } : m,
+                      ),
+                    }
+                  : c,
+              ),
+            );
+          }
         },
         onError: (err) => {
           const human = tr(fromThrown(err));
