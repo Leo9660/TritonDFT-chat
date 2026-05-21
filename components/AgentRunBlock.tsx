@@ -57,9 +57,20 @@ export function AgentRunBlock({ content, isStreaming, onRetry }: Props) {
       </header>
 
       <div className="agent-run-body">
-        <AgentStream content={content} />
-        {isStreaming && (
-          <span className="streaming-cursor" aria-hidden="true" />
+        {isStreaming && !content.trim() ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 0" }}>
+            <span className="thinking-dots" aria-hidden="true">
+              <span /><span /><span />
+            </span>
+            <span style={{ color: "var(--fg-mute)", fontSize: 13, fontStyle: "italic" }}>
+              {t("thinking")}
+            </span>
+          </div>
+        ) : (
+          <>
+            <AgentStream content={content} />
+            {isStreaming && <span className="streaming-cursor" aria-hidden="true" />}
+          </>
         )}
       </div>
 

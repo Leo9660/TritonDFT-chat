@@ -15,7 +15,6 @@ interface Props {
 }
 
 export function ChatMessages({ messages, isStreaming, onRetry, onRegenerate }: Props) {
-  const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -31,10 +30,10 @@ export function ChatMessages({ messages, isStreaming, onRetry, onRegenerate }: P
 
   const lastIdx = messages.length - 1;
   const lastMsg = messages[lastIdx];
+  // The last assistant message is "streaming" for the whole run — including
+  // before any output arrives (AgentRunBlock shows the thinking state then).
   const lastIsAssistantStreaming =
-    isStreaming && lastMsg?.role === "assistant" && lastMsg.content.length > 0;
-  const lastIsEmptyAssistant =
-    isStreaming && lastMsg?.role === "assistant" && lastMsg.content.length === 0;
+    isStreaming && lastMsg?.role === "assistant";
 
   // Map assistant index → preceding user prompt text (for retry).
   const promptForAssistant: Record<number, string> = {};
@@ -63,19 +62,6 @@ export function ChatMessages({ messages, isStreaming, onRetry, onRegenerate }: P
             onRegenerate={i === lastIdx ? onRegenerate : undefined}
           />
         ))}
-        {lastIsEmptyAssistant && (
-          <div
-            className="self-start flex items-center gap-3 px-4 py-3 rounded-2xl anim-slide-in"
-            style={{ background: "var(--bg-1)", border: "1px solid var(--border)" }}
-          >
-            <span className="thinking-dots" aria-hidden="true">
-              <span /><span /><span />
-            </span>
-            <span style={{ color: "var(--fg-mute)" }} className="text-sm italic">
-              {t("thinking")}
-            </span>
-          </div>
-        )}
         <div ref={endRef} />
       </div>
     </div>
