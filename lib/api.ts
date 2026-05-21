@@ -64,7 +64,9 @@ export function runJob(
       if (data.status === "queued") {
         cb.onQueue?.(data.queue_position ?? 0);
       } else if (data.status === "running") {
-        if (data.output) cb.onUpdate(data.output);
+        // Show a placeholder until the worker flushes its first output, so the
+        // UI doesn't keep showing a stale "Queued" message after it started.
+        cb.onUpdate(data.output || "⏳ Running…");
       } else {
         // Terminal: done | failed | timeout | cancelled
         if (data.status === "failed" || data.status === "timeout") {
