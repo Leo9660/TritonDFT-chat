@@ -50,6 +50,14 @@ html, body {
 
 ::selection { background: var(--blue-600); color: white; }
 
+/* Browsers don't give <button> a pointer cursor by default — make every
+   enabled button (and role=button) show the hand. Disabled controls keep
+   their own cursor (e.g. not-allowed). */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
 /* Scrollbars */
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
