@@ -98,12 +98,20 @@ function MessageBubbleImpl({
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [copyHover, setCopyHover] = useState(false);
 
   function copy() {
     navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 1400);
   }
+
+  // Green when just-copied, blue on hover, dim otherwise.
+  const copyColor = copied
+    ? "var(--green-500, #10b981)"
+    : copyHover
+      ? "var(--blue-500)"
+      : "var(--fg-dim)";
 
   if (message.role === "user") {
     return (
@@ -119,8 +127,10 @@ function MessageBubbleImpl({
         </div>
         <button
           onClick={copy}
-          className="mt-1 mr-0.5 inline-flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-          style={{ color: copied ? "var(--green-500, #10b981)" : "var(--fg-dim)" }}
+          onMouseEnter={() => setCopyHover(true)}
+          onMouseLeave={() => setCopyHover(false)}
+          className="mt-1 mr-0.5 inline-flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100 transition"
+          style={{ color: copyColor }}
           title={copied ? t("copied") : t("copy")}
         >
           {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
@@ -140,8 +150,10 @@ function MessageBubbleImpl({
         <div className="mt-1.5 ml-2 inline-flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={copy}
-            className="inline-flex items-center gap-1 text-xs"
-            style={{ color: copied ? "var(--green-500, #10b981)" : "var(--fg-dim)" }}
+            onMouseEnter={() => setCopyHover(true)}
+            onMouseLeave={() => setCopyHover(false)}
+            className="inline-flex items-center gap-1 text-xs transition"
+            style={{ color: copyColor }}
             title={copied ? t("copied") : t("copy")}
           >
             {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
