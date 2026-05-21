@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { CopyIcon, CheckIcon, RotateCwIcon } from "lucide-react";
 import { Message } from "@/lib/types";
@@ -16,10 +16,17 @@ interface Props {
 
 export function ChatMessages({ messages, isStreaming, onRetry, onRegenerate }: Props) {
   const { t } = useTranslation();
+  const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const el = scrollRef.current;
+    if (!el) return;
+    // Keep pinned to the bottom only when the user is already near it — don't
+    // yank them down while they've scrolled up reading. Instant scroll (no
+    // smooth) so it can't fight the rapid typewriter updates.
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 140;
+    if (nearBottom) endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, isStreaming]);
 
   const lastIdx = messages.length - 1;
@@ -43,7 +50,7 @@ export function ChatMessages({ messages, isStreaming, onRetry, onRegenerate }: P
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4">
+    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
       <div className="max-w-3xl mx-auto flex flex-col gap-5">
         {messages.map((m, i) => (
           <MessageBubble
@@ -75,7 +82,7 @@ export function ChatMessages({ messages, isStreaming, onRetry, onRegenerate }: P
   );
 }
 
-function MessageBubble({
+function MessageBubbleImpl({
   message,
   isStreaming,
   retryPrompt,
@@ -100,14 +107,25 @@ function MessageBubble({
 
   if (message.role === "user") {
     return (
-      <div
-        className="self-end max-w-[80%] rounded-2xl px-4 py-2.5 text-white whitespace-pre-wrap anim-slide-in"
-        style={{
-          background: "var(--grad-primary)",
-          boxShadow: "0 0 0 1px rgba(255,255,255,0.08) inset, 0 8px 22px rgba(69, 119, 255, 0.18)",
-        }}
-      >
-        {message.content}
+      <div className="self-end max-w-[80%] flex flex-col items-end group anim-slide-in">
+        <div
+          className="rounded-2xl px-4 py-2.5 text-white whitespace-pre-wrap"
+          style={{
+            background: "var(--grad-primary)",
+            boxShadow: "0 0 0 1px rgba(255,255,255,0.08) inset, 0 8px 22px rgba(69, 119, 255, 0.18)",
+          }}
+        >
+          {message.content}
+        </div>
+        <button
+          onClick={copy}
+          className="mt-1 mr-0.5 inline-flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ color: copied ? "var(--green-500, #10b981)" : "var(--fg-dim)" }}
+          title={copied ? t("copied") : t("copy")}
+        >
+          {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
+          {copied ? t("copied") : t("copy")}
+        </button>
       </div>
     );
   }
@@ -147,3 +165,14 @@ function MessageBubble({
     </div>
   );
 }
+
+// Memoized so a typewriter update to the streaming message doesn't re-render
+// every other (unchanged) bubble in the conversation.
+const MessageBubble = memo(
+  MessageBubbleImpl,
+  (a, b) =>
+    a.message === b.message &&
+    a.isLast === b.isLast &&
+    a.isStreaming === b.isStreaming &&
+    a.retryPrompt === b.retryPrompt,
+);

@@ -90,7 +90,13 @@ function LiCustom({ children }: AnyProps) {
   return <li>{children}</li>;
 }
 
-export function MessageRenderer({ content }: { content: string }) {
+// Memoized: during streaming only the last (growing) markdown block changes,
+// so earlier completed blocks skip the (costly) markdown re-parse.
+export const MessageRenderer = React.memo(function MessageRenderer({
+  content,
+}: {
+  content: string;
+}) {
   const processed = collapseBlankLines(autoCloseFence(content));
   return (
     <div className="prose-msg">
@@ -103,4 +109,4 @@ export function MessageRenderer({ content }: { content: string }) {
       </ReactMarkdown>
     </div>
   );
-}
+});

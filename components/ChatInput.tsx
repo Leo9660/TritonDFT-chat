@@ -27,7 +27,9 @@ export function ChatInput({ value, onChange, onSend, onStop, isStreaming, lastUs
   }, [value]);
 
   function onKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    // Enter sends; Shift+Enter inserts a newline. Skip while an IME
+    // composition is active — Enter then just confirms the candidate.
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       if (!isStreaming && value.trim()) onSend();
       return;

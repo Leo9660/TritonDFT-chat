@@ -408,7 +408,7 @@ export default function Page() {
             className="text-center text-xs mt-1.5"
             style={{ color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}
           >
-            ⌘/Ctrl + Enter to send
+            Enter to send · Shift+Enter for newline
           </div>
         </div>
       </main>
