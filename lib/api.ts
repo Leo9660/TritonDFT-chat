@@ -2,58 +2,120 @@ import { Message } from "./types";
 import { ApiError, loadToken } from "./auth";
 import { parseError, ParsedError } from "./errors";
 
-export interface StreamCallbacks {
-  onDelta: (text: string) => void;
+export interface JobCallbacks {
+  /** Full accumulated agent output so far (replace, don't append). */
+  onUpdate: (fullOutput: string) => void;
+  /** Called while the job waits in queue. position 0 = next to run. */
+  onQueue?: (position: number) => void;
   onDone: () => void;
   onError: (err: Error) => void;
-  /** Called on 401/402/403/413/429 etc. — receives the parsed error so the UI can show a translated message. */
+  /** 401/402/403/etc — receives the parsed error for translated UI messages. */
   onApiError?: (err: ParsedError) => void;
 }
 
-export async function streamChat(
+export interface JobHandle {
+  /** Stop polling and cancel the job server-side. */
+  cancel: () => void;
+}
+
+const POLL_INTERVAL_MS = 1500;
+
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  const t = loadToken();
+  if (t) h["Authorization"] = `Bearer ${t}`;
+  return h;
+}
+
+/**
+ * Submit a DFT job and poll it to completion.
+ *
+ * Execution is decoupled from this request — the job runs on a backend worker
+ * and survives the browser closing. Returns a handle whose cancel() stops
+ * polling and cancels the job server-side.
+ */
+export function runJob(
   backendUrl: string,
   messages: Message[],
-  signal: AbortSignal,
-  cb: StreamCallbacks,
-): Promise<void> {
-  try {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const token = loadToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+  cb: JobCallbacks,
+): JobHandle {
+  const base = backendUrl.replace(/\/$/, "");
+  let stopped = false;
+  let jobId: string | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const resp = await fetch(`${backendUrl.replace(/\/$/, "")}/v1/chat/completions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        messages: messages.map(({ role, content }) => ({ role, content })),
-        stream: true,
-      }),
-      signal,
-    });
-
-    if (!resp.ok || !resp.body) {
-      const txt = await resp.text().catch(() => "");
-      const parsed = parseError(resp.status, txt);
-      cb.onApiError?.(parsed);
-      throw new ApiError(parsed);
-    }
-
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      if (chunk) cb.onDelta(chunk);
-    }
-
-    cb.onDone();
-  } catch (err) {
-    if ((err as Error).name === "AbortError") {
-      cb.onDone();
-      return;
-    }
-    cb.onError(err as Error);
+  function fail(status: number, txt: string) {
+    const parsed = parseError(status, txt);
+    cb.onApiError?.(parsed);
+    cb.onError(new ApiError(parsed));
   }
+
+  async function poll() {
+    if (stopped || !jobId) return;
+    try {
+      const resp = await fetch(`${base}/jobs/${jobId}`, { headers: authHeaders() });
+      if (!resp.ok) {
+        fail(resp.status, await resp.text().catch(() => ""));
+        return;
+      }
+      const data = await resp.json();
+      if (stopped) return;
+
+      if (data.status === "queued") {
+        cb.onQueue?.(data.queue_position ?? 0);
+      } else if (data.status === "running") {
+        if (data.output) cb.onUpdate(data.output);
+      } else {
+        // Terminal: done | failed | timeout | cancelled
+        if (data.status === "failed" || data.status === "timeout") {
+          const tail = data.error ? `\n\n> ⚠️ ${data.error}` : "";
+          cb.onUpdate((data.output || "") + tail);
+        } else if (typeof data.output === "string") {
+          cb.onUpdate(data.output);
+        }
+        cb.onDone();
+        return;
+      }
+      timer = setTimeout(poll, POLL_INTERVAL_MS);
+    } catch (e) {
+      if (!stopped) cb.onError(e as Error);
+    }
+  }
+
+  (async () => {
+    try {
+      const resp = await fetch(`${base}/jobs`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          messages: messages.map(({ role, content }) => ({ role, content })),
+        }),
+      });
+      if (!resp.ok) {
+        fail(resp.status, await resp.text().catch(() => ""));
+        return;
+      }
+      const data = await resp.json();
+      jobId = data.job_id;
+      if ((data.queue_position ?? 0) > 0) cb.onQueue?.(data.queue_position);
+      poll();
+    } catch (e) {
+      if (!stopped) cb.onError(e as Error);
+    }
+  })();
+
+  return {
+    cancel: () => {
+      if (stopped) return;
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      if (jobId) {
+        fetch(`${base}/jobs/${jobId}/cancel`, {
+          method: "POST",
+          headers: authHeaders(),
+        }).catch(() => {});
+      }
+      cb.onDone();
+    },
+  };
 }

@@ -27,7 +27,7 @@ import {
   loadPrompts,
   savePrompts,
 } from "@/lib/storage";
-import { streamChat } from "@/lib/api";
+import { runJob, JobHandle } from "@/lib/api";
 import { downloadMarkdown, copyMarkdown } from "@/lib/export";
 import { useAuth } from "@/lib/auth-context";
 import { LoginGate } from "@/components/LoginGate";
@@ -56,7 +56,7 @@ export default function Page() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [activityWidth, setActivityWidth] = useState<number>(ACTIVITY_DEFAULT);
 
-  const abortRef = useRef<AbortController | null>(null);
+  const jobRef = useRef<JobHandle | null>(null);
 
   // Hydrate
   useEffect(() => {
@@ -200,50 +200,49 @@ export default function Page() {
       if (!overrideText) setInput("");
       setIsStreaming(true);
 
-      const ctrl = new AbortController();
-      abortRef.current = ctrl;
       // Backend's extract_user_message only uses the latest user msg; sending
       // history bloats the payload and trips the 2M conversation-size cap when
       // a prior assistant turn contained large logs (e.g. MPI dumps).
       const baseMsgs: Message[] = [userMsg];
 
-      await streamChat(backendUrl, baseMsgs, ctrl.signal, {
-        onDelta: (delta) => {
-          setConversations((cs) =>
-            cs.map((c) =>
-              c.id === convId
-                ? {
-                    ...c,
-                    messages: c.messages.map((m, i) =>
-                      i === c.messages.length - 1 ? { ...m, content: m.content + delta } : m,
-                    ),
-                  }
-                : c,
-            ),
+      // Replace the trailing assistant message's content wholesale (job output
+      // is cumulative — each poll returns the full text so far).
+      const setAssistant = (content: string) =>
+        setConversations((cs) =>
+          cs.map((c) =>
+            c.id === convId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m, i) =>
+                    i === c.messages.length - 1 ? { ...m, content } : m,
+                  ),
+                }
+              : c,
+          ),
+        );
+
+      jobRef.current = runJob(backendUrl, baseMsgs, {
+        onQueue: (pos) => {
+          setAssistant(
+            pos === 0
+              ? "⏳ Starting…"
+              : `⏳ Queued — ${pos} job${pos === 1 ? "" : "s"} ahead of you`,
           );
+        },
+        onUpdate: (output) => {
+          setAssistant(output);
         },
         onDone: () => {
           setIsStreaming(false);
+          jobRef.current = null;
           // Refresh credits after each completed run
           auth.refresh();
         },
         onError: (err) => {
           const human = tr(fromThrown(err));
-          setConversations((cs) =>
-            cs.map((c) =>
-              c.id === convId
-                ? {
-                    ...c,
-                    messages: c.messages.map((m, i) =>
-                      i === c.messages.length - 1
-                        ? { ...m, content: m.content + `\n\n> ⚠️ ${human}` }
-                        : m,
-                    ),
-                  }
-                : c,
-            ),
-          );
+          setAssistant(`> ⚠️ ${human}`);
           setIsStreaming(false);
+          jobRef.current = null;
         },
         onApiError: (parsed) => {
           // 401/403 means session is gone — sign out so the LoginGate appears.
@@ -277,7 +276,7 @@ export default function Page() {
     [active, sendMessage],
   );
 
-  const stopStreaming = useCallback(() => abortRef.current?.abort(), []);
+  const stopStreaming = useCallback(() => jobRef.current?.cancel(), []);
 
   const toggleLang = useCallback(() => {
     const next: Lang = lang === "en" ? "zh" : "en";
