@@ -34,6 +34,10 @@ function authHeaders(): Record<string, string> {
  * Execution is decoupled from this request — the job runs on a backend worker
  * and survives the browser closing. Returns a handle whose cancel() stops
  * polling and cancels the job server-side.
+ *
+ * Polling fetches the *full* output every 1.5s, but a client-side typewriter
+ * reveals it character-by-character with human-like jitter — so the visual
+ * cadence is decoupled from the (chunky) network cadence.
  */
 export function runJob(
   backendUrl: string,
@@ -43,12 +47,60 @@ export function runJob(
   const base = backendUrl.replace(/\/$/, "");
   let stopped = false;
   let jobId: string | null = null;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pollTimer: ReturnType<typeof setTimeout> | null = null;
+  let typeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Typewriter state
+  let target = "";                                  // full output from latest poll
+  let displayed = 0;                                // chars revealed so far
+  let phase: "queued" | "running" | "terminal" = "queued";
+  let lastSent: string | null = null;
 
   function fail(status: number, txt: string) {
     const parsed = parseError(status, txt);
     cb.onApiError?.(parsed);
     cb.onError(new ApiError(parsed));
+  }
+
+  function emit(s: string) {
+    if (s !== lastSent) {
+      lastSent = s;
+      cb.onUpdate(s);
+    }
+  }
+
+  // Jittered inter-keystroke delay — mostly fast, with the occasional
+  // human-like pause.
+  function nextDelay(): number {
+    const r = Math.random();
+    if (r < 0.05) return 90 + Math.random() * 150;   // occasional "thinking" pause
+    return 11 + Math.random() * 36;                  // normal jittery typing
+  }
+
+  function typeTick() {
+    if (stopped) return;
+    if (displayed < target.length) {
+      const remaining = target.length - displayed;
+      // Big backlog → reveal in chunks so we track the 1.5s poll cadence;
+      // near the end → 1–2 chars at a time for a genuine typing feel.
+      const step =
+        remaining > 220 ? Math.ceil(remaining / 55) : 1 + Math.floor(Math.random() * 2);
+      displayed = Math.min(target.length, displayed + step);
+      emit(target.slice(0, displayed));
+      typeTimer = setTimeout(typeTick, nextDelay());
+    } else if (phase === "terminal") {
+      typeTimer = null;
+      cb.onDone(jobId);
+    } else {
+      // Caught up but job still running — show a placeholder if nothing has
+      // streamed yet, then idle-poll for more.
+      if (phase === "running" && target.length === 0) emit("⏳ Running…");
+      typeTimer = setTimeout(typeTick, 60);
+    }
+  }
+
+  function ensureTyping() {
+    if (typeTimer === null && !stopped) typeTick();
   }
 
   async function poll() {
@@ -64,22 +116,22 @@ export function runJob(
 
       if (data.status === "queued") {
         cb.onQueue?.(data.queue_position ?? 0);
+        pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
       } else if (data.status === "running") {
-        // Show a placeholder until the worker flushes its first output, so the
-        // UI doesn't keep showing a stale "Queued" message after it started.
-        cb.onUpdate(data.output || "⏳ Running…");
+        phase = "running";
+        target = data.output || "";
+        ensureTyping();
+        pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
       } else {
         // Terminal: done | failed | timeout | cancelled
-        if (data.status === "failed" || data.status === "timeout") {
-          const tail = data.error ? `\n\n> ⚠️ ${data.error}` : "";
-          cb.onUpdate((data.output || "") + tail);
-        } else if (typeof data.output === "string") {
-          cb.onUpdate(data.output);
+        let full = data.output || "";
+        if ((data.status === "failed" || data.status === "timeout") && data.error) {
+          full += `\n\n> ⚠️ ${data.error}`;
         }
-        cb.onDone(jobId);
-        return;
+        target = full;
+        phase = "terminal";
+        ensureTyping();   // typewriter drains the rest, then calls onDone
       }
-      timer = setTimeout(poll, POLL_INTERVAL_MS);
     } catch (e) {
       if (!stopped) cb.onError(e as Error);
     }
@@ -111,7 +163,8 @@ export function runJob(
     cancel: () => {
       if (stopped) return;
       stopped = true;
-      if (timer) clearTimeout(timer);
+      if (pollTimer) clearTimeout(pollTimer);
+      if (typeTimer) clearTimeout(typeTimer);
       if (jobId) {
         fetch(`${base}/jobs/${jobId}/cancel`, {
           method: "POST",
