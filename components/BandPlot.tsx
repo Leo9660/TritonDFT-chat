@@ -14,8 +14,12 @@ export function BandPlot({ data }: { data: BandData }) {
   const plotW = W - pad.l - pad.r;
   const plotH = H - pad.t - pad.b;
 
-  const hasFermi = data.e_fermi != null && Number.isFinite(data.e_fermi);
-  const shift = hasFermi ? (data.e_fermi as number) : 0;
+  // Only Fermi-align if E_F is actually within the band energy range — guards
+  // against a stale/mismatched reference (then fall back to full range).
+  const ef = data.e_fermi;
+  const hasFermi =
+    ef != null && Number.isFinite(ef) && ef >= data.e_min && ef <= data.e_max;
+  const shift = hasFermi ? (ef as number) : 0;
 
   // Display window, in Fermi-referenced (E − E_F) units.
   const yLo = hasFermi ? -6 : data.e_min - shift;
