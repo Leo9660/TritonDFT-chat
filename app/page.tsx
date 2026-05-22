@@ -48,7 +48,9 @@ export default function Page() {
   const [prompts, setPrompts] = useState<PromptTemplate[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
+  // Per-conversation streaming state — the backend queue is concurrent, so
+  // different conversations can each have a job running at the same time.
+  const [streamingConvs, setStreamingConvs] = useState<Set<string>>(new Set());
   const [lang, setLang] = useState<Lang>("en");
   const [backendUrl, setBackendUrl] = useState<string>("");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -56,7 +58,7 @@ export default function Page() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [activityWidth, setActivityWidth] = useState<number>(ACTIVITY_DEFAULT);
 
-  const jobRef = useRef<JobHandle | null>(null);
+  const jobHandles = useRef<Map<string, JobHandle>>(new Map());
 
   // Hydrate
   useEffect(() => {
@@ -90,6 +92,9 @@ export default function Page() {
     () => conversations.find((c) => c.id === activeId) ?? null,
     [conversations, activeId],
   );
+
+  // Is the currently-viewed conversation streaming? (drives input disable etc.)
+  const activeStreaming = activeId != null && streamingConvs.has(activeId);
 
   // ─── Conversation actions ───
   const newChat = useCallback(() => {
@@ -172,6 +177,9 @@ export default function Page() {
         convId = id;
       }
 
+      // convId is finalized; bail if that conversation already has a job running.
+      if (!convId || streamingConvs.has(convId)) return;
+
       const userMsg: Message = {
         id: nanoid(8),
         role: "user",
@@ -198,7 +206,7 @@ export default function Page() {
         ),
       );
       if (!overrideText) setInput("");
-      setIsStreaming(true);
+      setStreamingConvs((s) => new Set(s).add(convId));
 
       // Backend's extract_user_message only uses the latest user msg; sending
       // history bloats the payload and trips the 2M conversation-size cap when
@@ -221,7 +229,14 @@ export default function Page() {
           ),
         );
 
-      jobRef.current = runJob(backendUrl, baseMsgs, {
+      const stopStreamingConv = () =>
+        setStreamingConvs((s) => {
+          const n = new Set(s);
+          n.delete(convId);
+          return n;
+        });
+
+      const handle = runJob(backendUrl, baseMsgs, {
         onQueue: (pos) => {
           setAssistant(
             pos === 0
@@ -233,8 +248,8 @@ export default function Page() {
           setAssistant(output);
         },
         onDone: (jobId) => {
-          setIsStreaming(false);
-          jobRef.current = null;
+          stopStreamingConv();
+          jobHandles.current.delete(convId);
           // Refresh credits after each completed run
           auth.refresh();
           // Stamp the job id onto the assistant message so ChatMessages can
@@ -257,8 +272,8 @@ export default function Page() {
         onError: (err) => {
           const human = tr(fromThrown(err));
           setAssistant(`> ⚠️ ${human}`);
-          setIsStreaming(false);
-          jobRef.current = null;
+          stopStreamingConv();
+          jobHandles.current.delete(convId);
         },
         onApiError: (parsed) => {
           // 401/403 means session is gone — sign out so the LoginGate appears.
@@ -270,8 +285,9 @@ export default function Page() {
           auth.refresh();
         },
       });
+      jobHandles.current.set(convId, handle);
     },
-    [input, activeId, active, backendUrl, auth],
+    [input, activeId, active, backendUrl, auth, streamingConvs],
   );
 
   // Regenerate: drop the trailing assistant msg (and trailing user-only artifacts)
@@ -292,7 +308,9 @@ export default function Page() {
     [active, sendMessage],
   );
 
-  const stopStreaming = useCallback(() => jobRef.current?.cancel(), []);
+  const stopStreaming = useCallback(() => {
+    if (activeId) jobHandles.current.get(activeId)?.cancel();
+  }, [activeId]);
 
   const toggleLang = useCallback(() => {
     const next: Lang = lang === "en" ? "zh" : "en";
@@ -388,7 +406,7 @@ export default function Page() {
         ) : (
           <ChatMessages
             messages={active!.messages}
-            isStreaming={isStreaming}
+            isStreaming={activeStreaming}
             onRetry={(prompt) => sendMessage(prompt)}
             onRegenerate={(prompt) => regenerate(prompt)}
           />
@@ -399,7 +417,7 @@ export default function Page() {
             onChange={setInput}
             onSend={() => sendMessage()}
             onStop={stopStreaming}
-            isStreaming={isStreaming}
+            isStreaming={activeStreaming}
             lastUserMessage={
               [...(active?.messages ?? [])].reverse().find((m) => m.role === "user")?.content
             }
@@ -424,7 +442,7 @@ export default function Page() {
           <div style={{ width: activityWidth }} className="hidden lg:flex shrink-0">
             <AgentActivityPanel
               conversation={active}
-              isStreaming={isStreaming}
+              isStreaming={activeStreaming}
               onClose={() => setPanelOpen(false)}
             />
           </div>

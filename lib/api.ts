@@ -204,6 +204,7 @@ export interface BandData {
   e_max: number;
   k_min: number;
   k_max: number;
+  e_fermi: number | null;   // Fermi energy (eV) for zero-referencing the plot
 }
 
 export interface JobDetail {
