@@ -171,6 +171,10 @@ export function runJob(
           headers: authHeaders(),
         }).catch(() => {});
       }
+      // Replace a frozen "⏳ Queued/Running" placeholder (or leave partial
+      // output) with a clear stopped state — don't leave it looking stuck.
+      const partial = lastSent && !lastSent.startsWith("⏳") ? lastSent.replace(/\s+$/, "") : "";
+      cb.onUpdate((partial ? partial + "\n\n" : "") + "> ⏹ Stopped.");
       cb.onDone(jobId);
     },
   };

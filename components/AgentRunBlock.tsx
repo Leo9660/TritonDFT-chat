@@ -28,12 +28,26 @@ export function AgentRunBlock({ content, isStreaming, onRetry }: Props) {
   const { t } = useTranslation();
   const { stepCount, errorAt } = useMemo(() => parseAgentState(content), [content]);
 
+  const trimmed = content.trim();
+  // "Waiting" = streaming but only a ⏳ placeholder (queued / starting / no
+  // output yet) — show a calm dots state, not the raw placeholder in the body.
+  const isWaiting = isStreaming && (!trimmed || trimmed.startsWith("⏳"));
+  let waitWord = "Working";
+  if (!trimmed) waitWord = "Thinking";
+  else if (trimmed.startsWith("⏳ Queued")) waitWord = "Queued";
+  else if (trimmed.startsWith("⏳ Starting")) waitWord = "Starting";
+  else if (trimmed.startsWith("⏳ Running")) waitWord = "Running";
+  const waitingText = !trimmed ? t("thinking") : trimmed.replace(/^⏳\s*/, "");
+
   const hasFailed = !isStreaming && errorAt > 0;
   const labelPlural = (n: number) => `${n} step${n === 1 ? "" : "s"}`;
 
   let statusClass = "is-done";
   let statusText: string;
-  if (isStreaming) {
+  if (isWaiting) {
+    statusClass = "is-live";
+    statusText = waitWord;
+  } else if (isStreaming) {
     statusClass = "is-live";
     statusText = `Running · ${labelPlural(stepCount)}`;
   } else if (hasFailed) {
@@ -57,13 +71,13 @@ export function AgentRunBlock({ content, isStreaming, onRetry }: Props) {
       </header>
 
       <div className="agent-run-body">
-        {isStreaming && !content.trim() ? (
+        {isWaiting ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 0" }}>
             <span className="thinking-dots" aria-hidden="true">
               <span /><span /><span />
             </span>
             <span style={{ color: "var(--fg-mute)", fontSize: 13, fontStyle: "italic" }}>
-              {t("thinking")}
+              {waitingText}
             </span>
           </div>
         ) : (
