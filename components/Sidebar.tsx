@@ -20,8 +20,8 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Conversation, Folder } from "@/lib/types";
-import { MODELS } from "@/lib/models";
 import { cn } from "@/lib/utils";
+import { ModelDropdown } from "./ModelDropdown";
 
 interface Props {
   conversations: Conversation[];
@@ -120,38 +120,7 @@ export function Sidebar(props: Props) {
     >
       {/* Model + run mode (per conversation) — one row, above New chat */}
       <div className="px-3 pt-3 pb-2.5 border-b flex items-center gap-2" style={{ borderColor: "var(--border)" }}>
-        <div className="relative flex-1 min-w-0">
-          <select
-            value={model}
-            onChange={(e) => onModelChange(e.target.value)}
-            disabled={controlsDisabled}
-            className="w-full appearance-none rounded-lg pl-2.5 pr-7 py-1.5 outline-none cursor-pointer truncate"
-            style={{
-              background: "var(--bg-0)",
-              color: "var(--fg)",
-              border: "1px solid var(--border)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-            }}
-          >
-            {MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDownIcon
-            size={14}
-            style={{
-              position: "absolute",
-              right: 8,
-              top: "50%",
-              transform: "translateY(-50%)",
-              pointerEvents: "none",
-              color: "var(--fg-dim)",
-            }}
-          />
-        </div>
+        <ModelDropdown value={model} onChange={onModelChange} disabled={controlsDisabled} />
         {canUseCpu ? (
           <button
             type="button"
