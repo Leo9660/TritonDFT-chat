@@ -453,6 +453,12 @@ export default function Page() {
         onDeleteFolder={deleteFolder}
         onToggleFolder={toggleFolder}
         onOpenPrompts={() => setPromptsOpen(true)}
+        model={model}
+        onModelChange={onModelChange}
+        scriptOnly={scriptOnly}
+        onToggleScriptOnly={onToggleScriptOnly}
+        canUseCpu={canUseCpu}
+        controlsDisabled={activeStreaming}
       />
       <main className="flex-1 flex flex-col min-w-0">
         <TopBar
@@ -464,12 +470,6 @@ export default function Page() {
           onTogglePanel={() => setPanelOpen((x) => !x)}
           onExport={() => { if (active) downloadMarkdown(active); }}
           onCopy={async () => { if (active) await copyMarkdown(active); }}
-          model={model}
-          onModelChange={onModelChange}
-          scriptOnly={scriptOnly}
-          onToggleScriptOnly={onToggleScriptOnly}
-          canUseCpu={canUseCpu}
-          controlsDisabled={activeStreaming}
         />
         {showEmpty ? (
           <EmptyState onPrompt={(text) => sendMessage(text)} />

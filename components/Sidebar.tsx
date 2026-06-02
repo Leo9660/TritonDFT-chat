@@ -15,9 +15,12 @@ import {
   XIcon,
   BookOpenIcon,
   MoreHorizontalIcon,
+  CpuIcon,
+  FileCodeIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Conversation, Folder } from "@/lib/types";
+import { MODELS } from "@/lib/models";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -34,6 +37,13 @@ interface Props {
   onDeleteFolder: (id: string) => void;
   onToggleFolder: (id: string) => void;
   onOpenPrompts: () => void;
+  // Per-conversation model + execution mode.
+  model: string;
+  onModelChange: (m: string) => void;
+  scriptOnly: boolean;
+  onToggleScriptOnly: () => void;
+  canUseCpu: boolean;
+  controlsDisabled: boolean;
 }
 
 function relativeTime(ts: number, locale: string): string {
@@ -77,9 +87,16 @@ export function Sidebar(props: Props) {
     onDeleteFolder,
     onToggleFolder,
     onOpenPrompts,
+    model,
+    onModelChange,
+    scriptOnly,
+    onToggleScriptOnly,
+    canUseCpu,
+    controlsDisabled,
   } = props;
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState("");
+  const cpuOn = canUseCpu && !scriptOnly;
 
   const filtered = useMemo(() => {
     if (!query.trim()) return conversations;
@@ -120,6 +137,83 @@ export function Sidebar(props: Props) {
           <SecondaryButton onClick={onNewFolder} icon={<FolderPlusIcon size={13} />} label={t("newFolder")} />
           <SecondaryButton onClick={onOpenPrompts} icon={<BookOpenIcon size={13} />} label={t("prompts")} />
         </div>
+      </div>
+
+      {/* Model + run mode (per conversation) */}
+      <div className="px-3 py-2.5 border-b flex flex-col gap-2" style={{ borderColor: "var(--border)" }}>
+        <span
+          className="text-[10px] uppercase tracking-wider"
+          style={{ color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}
+        >
+          Model
+        </span>
+        <div className="relative">
+          <select
+            value={model}
+            onChange={(e) => onModelChange(e.target.value)}
+            disabled={controlsDisabled}
+            className="w-full appearance-none rounded-lg pl-2.5 pr-7 py-1.5 outline-none cursor-pointer"
+            style={{
+              background: "var(--bg-0)",
+              color: "var(--fg)",
+              border: "1px solid var(--border)",
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+            }}
+          >
+            {MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label} · {m.hint}
+              </option>
+            ))}
+          </select>
+          <ChevronDownIcon
+            size={14}
+            style={{
+              position: "absolute",
+              right: 8,
+              top: "50%",
+              transform: "translateY(-50%)",
+              pointerEvents: "none",
+              color: "var(--fg-dim)",
+            }}
+          />
+        </div>
+        {canUseCpu ? (
+          <button
+            type="button"
+            onClick={onToggleScriptOnly}
+            disabled={controlsDisabled}
+            title={cpuOn
+              ? "CPU run: executes the DFT calculation"
+              : "Script-only: generates the inputs without running them"}
+            className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs transition"
+            style={{
+              border: "1px solid var(--border)",
+              background: cpuOn ? "rgba(34,197,94,0.12)" : "var(--bg-0)",
+              color: cpuOn ? "#22c55e" : "var(--fg-mute)",
+              fontWeight: 600,
+              cursor: controlsDisabled ? "not-allowed" : "pointer",
+            }}
+          >
+            {cpuOn ? <CpuIcon size={13} /> : <FileCodeIcon size={13} />}
+            {cpuOn ? "CPU run" : "Script-only"}
+          </button>
+        ) : (
+          <span
+            title="Your account generates input scripts only. Running on CPU requires an admin."
+            className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs"
+            style={{
+              border: "1px solid var(--border)",
+              background: "var(--bg-0)",
+              color: "var(--fg-dim)",
+              fontWeight: 600,
+            }}
+          >
+            <FileCodeIcon size={13} />
+            Script-only
+          </span>
+        )}
       </div>
 
       {/* Search */}
