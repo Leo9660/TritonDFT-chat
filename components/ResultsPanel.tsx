@@ -79,6 +79,13 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
   // Nothing produced (e.g. agent errored before any run) — don't show an empty box.
   const result = detail?.result || null;
   const hasResult = result && Object.keys(result).length > 0;
+  const hasCards = !!(
+    result &&
+    (result.material ||
+      result.task_type ||
+      typeof result.final_energy_ev === "number" ||
+      typeof result.band_gap_ev === "number")
+  );
   if (!hasResult && files.length === 0 && !bands) return null;
 
   return (
@@ -102,8 +109,45 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
 
       {open && (
         <div style={{ padding: "12px 14px 16px" }}>
+          {/* analysis / conclusion — the answer to the question */}
+          {result?.analysis && (
+            <div
+              style={{
+                marginBottom: 14,
+                padding: "11px 13px",
+                borderRadius: 10,
+                background: "rgba(69,119,255,0.06)",
+                border: "1px solid rgba(69,119,255,0.25)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: ".06em",
+                  color: "var(--blue-500, #4577ff)",
+                  fontWeight: 700,
+                  marginBottom: 5,
+                }}
+              >
+                Analysis · conclusion
+              </div>
+              <div
+                style={{
+                  fontSize: 13,
+                  lineHeight: 1.62,
+                  color: "var(--fg)",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                }}
+              >
+                {result.analysis}
+              </div>
+            </div>
+          )}
+
           {/* key-value cards */}
-          {hasResult && (
+          {hasCards && (
             <div
               style={{
                 display: "grid",

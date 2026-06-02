@@ -16,6 +16,10 @@ export interface Conversation {
   createdAt: number;
   updatedAt: number;
   folderId?: string | null;
+  /** OpenAI model used for this chat. */
+  model?: string;
+  /** Generate input files without running them on CPU. */
+  scriptOnly?: boolean;
 }
 
 export interface Folder {

@@ -39,10 +39,16 @@ function authHeaders(): Record<string, string> {
  * reveals it character-by-character with human-like jitter — so the visual
  * cadence is decoupled from the (chunky) network cadence.
  */
+export interface JobOptions {
+  model?: string;
+  scriptOnly?: boolean;
+}
+
 export function runJob(
   backendUrl: string,
   messages: Message[],
   cb: JobCallbacks,
+  opts: JobOptions = {},
 ): JobHandle {
   const base = backendUrl.replace(/\/$/, "");
   let stopped = false;
@@ -144,6 +150,8 @@ export function runJob(
         headers: authHeaders(),
         body: JSON.stringify({
           messages: messages.map(({ role, content }) => ({ role, content })),
+          ...(opts.model ? { model: opts.model } : {}),
+          ...(opts.scriptOnly != null ? { script_only: opts.scriptOnly } : {}),
         }),
       });
       if (!resp.ok) {
@@ -188,6 +196,8 @@ export interface JobResult {
   final_energy_ry?: number;
   final_energy_ev?: number;
   band_gap_ev?: number;
+  /** The agent's natural-language conclusion — the answer to the question. */
+  analysis?: string;
 }
 
 export interface JobFile {

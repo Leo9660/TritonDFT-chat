@@ -6,14 +6,29 @@ const BACKEND_KEY = "tritondft.backendUrl.v1";
 const FOLDERS_KEY = "tritondft.folders.v1";
 const PROMPTS_KEY = "tritondft.prompts.v1";
 
+// Per-account scope: conversations/folders/prompts are namespaced by the
+// signed-in user's email so switching accounts in one browser never shows the
+// previous account's chats. Account-independent prefs (lang, backend URL) stay
+// global.
+let _scope = "";
+
+/** Set the active account scope (user email, or null when signed out). */
+export function setStorageScope(email: string | null | undefined) {
+  _scope = email ? `::${email.toLowerCase()}` : "::guest";
+}
+
 function isBrowser() {
   return typeof window !== "undefined";
+}
+
+function scoped(key: string): string {
+  return key + _scope;
 }
 
 export function loadConversations(): Conversation[] {
   if (!isBrowser()) return [];
   try {
-    const raw = localStorage.getItem(CONV_KEY);
+    const raw = localStorage.getItem(scoped(CONV_KEY));
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -23,7 +38,7 @@ export function loadConversations(): Conversation[] {
 
 export function saveConversations(conversations: Conversation[]) {
   if (!isBrowser()) return;
-  localStorage.setItem(CONV_KEY, JSON.stringify(conversations));
+  localStorage.setItem(scoped(CONV_KEY), JSON.stringify(conversations));
 }
 
 export function loadLang(): Lang {
@@ -56,7 +71,7 @@ export function saveBackendUrl(url: string) {
 export function loadFolders(): Folder[] {
   if (!isBrowser()) return [];
   try {
-    const raw = localStorage.getItem(FOLDERS_KEY);
+    const raw = localStorage.getItem(scoped(FOLDERS_KEY));
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -66,7 +81,7 @@ export function loadFolders(): Folder[] {
 
 export function saveFolders(folders: Folder[]) {
   if (!isBrowser()) return;
-  localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+  localStorage.setItem(scoped(FOLDERS_KEY), JSON.stringify(folders));
 }
 
 export function loadPrompts(): PromptTemplate[] {
@@ -74,7 +89,7 @@ export function loadPrompts(): PromptTemplate[] {
     return DEFAULT_PROMPTS;
   }
   try {
-    const raw = localStorage.getItem(PROMPTS_KEY);
+    const raw = localStorage.getItem(scoped(PROMPTS_KEY));
     if (!raw) return DEFAULT_PROMPTS;
     return JSON.parse(raw);
   } catch {
@@ -84,7 +99,7 @@ export function loadPrompts(): PromptTemplate[] {
 
 export function savePrompts(prompts: PromptTemplate[]) {
   if (!isBrowser()) return;
-  localStorage.setItem(PROMPTS_KEY, JSON.stringify(prompts));
+  localStorage.setItem(scoped(PROMPTS_KEY), JSON.stringify(prompts));
 }
 
 const DEFAULT_PROMPTS: PromptTemplate[] = [

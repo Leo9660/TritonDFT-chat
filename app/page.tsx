@@ -26,8 +26,10 @@ import {
   saveFolders,
   loadPrompts,
   savePrompts,
+  setStorageScope,
 } from "@/lib/storage";
 import { runJob, JobHandle } from "@/lib/api";
+import { DEFAULT_MODEL } from "@/lib/models";
 import { downloadMarkdown, copyMarkdown } from "@/lib/export";
 import { useAuth } from "@/lib/auth-context";
 import { LoginGate } from "@/components/LoginGate";
@@ -42,12 +44,20 @@ export default function Page() {
   const { i18n } = useTranslation();
   const auth = useAuth();
   const [hydrated, setHydrated] = useState(false);
+  // True once conversations are loaded under the correct per-account scope —
+  // gates saving so we never write before the scope is set.
+  const [scopeReady, setScopeReady] = useState(false);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [prompts, setPrompts] = useState<PromptTemplate[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  // Composer selection (model + execution mode), per-conversation.
+  const [model, setModel] = useState<string>(DEFAULT_MODEL);
+  const [scriptOnly, setScriptOnly] = useState<boolean>(true);
+  // Only admins / unlimited accounts may run CPU; everyone else is script-only.
+  const canUseCpu = !!(auth.user?.is_admin || auth.user?.is_unlimited);
   // Per-conversation streaming state — the backend queue is concurrent, so
   // different conversations can each have a job running at the same time.
   const [streamingConvs, setStreamingConvs] = useState<Set<string>>(new Set());
@@ -60,13 +70,8 @@ export default function Page() {
 
   const jobHandles = useRef<Map<string, JobHandle>>(new Map());
 
-  // Hydrate
+  // Hydrate account-independent prefs once on mount.
   useEffect(() => {
-    const convs = loadConversations();
-    setConversations(convs);
-    setActiveId(convs[0]?.id ?? null);
-    setFolders(loadFolders());
-    setPrompts(loadPrompts());
     const lng = loadLang();
     setLang(lng);
     i18n.changeLanguage(lng);
@@ -78,15 +83,35 @@ export default function Page() {
     setHydrated(true);
   }, [i18n]);
 
+  // (Re)load per-account chat data whenever the signed-in user changes — fixes
+  // account switching showing the previous account's chats.
+  const userKey = auth.user?.email ?? null;
   useEffect(() => {
-    if (hydrated) saveConversations(conversations);
-  }, [conversations, hydrated]);
+    if (auth.loading) return;
+    setStorageScope(userKey);
+    const convs = loadConversations();
+    setConversations(convs);
+    setActiveId(convs[0]?.id ?? null);
+    setFolders(loadFolders());
+    setPrompts(loadPrompts());
+    setScopeReady(true);
+  }, [userKey, auth.loading]);
+
+  // Default execution mode per account: regular users are locked to script-only;
+  // admins / unlimited default to CPU on.
   useEffect(() => {
-    if (hydrated) saveFolders(folders);
-  }, [folders, hydrated]);
+    setScriptOnly(!canUseCpu);
+  }, [canUseCpu]);
+
   useEffect(() => {
-    if (hydrated) savePrompts(prompts);
-  }, [prompts, hydrated]);
+    if (scopeReady) saveConversations(conversations);
+  }, [conversations, scopeReady]);
+  useEffect(() => {
+    if (scopeReady) saveFolders(folders);
+  }, [folders, scopeReady]);
+  useEffect(() => {
+    if (scopeReady) savePrompts(prompts);
+  }, [prompts, scopeReady]);
 
   const active = useMemo(
     () => conversations.find((c) => c.id === activeId) ?? null,
@@ -95,6 +120,40 @@ export default function Page() {
 
   // Is the currently-viewed conversation streaming? (drives input disable etc.)
   const activeStreaming = activeId != null && streamingConvs.has(activeId);
+
+  // When switching conversations, restore that chat's saved model / mode.
+  useEffect(() => {
+    const c = conversations.find((x) => x.id === activeId);
+    if (!c) return;
+    if (c.model) setModel(c.model);
+    if (typeof c.scriptOnly === "boolean" && canUseCpu) setScriptOnly(c.scriptOnly);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
+
+  const onToggleScriptOnly = useCallback(() => {
+    if (!canUseCpu) return;
+    setScriptOnly((s) => {
+      const next = !s;
+      if (activeId) {
+        setConversations((cs) =>
+          cs.map((c) => (c.id === activeId ? { ...c, scriptOnly: next } : c)),
+        );
+      }
+      return next;
+    });
+  }, [canUseCpu, activeId]);
+
+  const onModelChange = useCallback(
+    (m: string) => {
+      setModel(m);
+      if (activeId) {
+        setConversations((cs) =>
+          cs.map((c) => (c.id === activeId ? { ...c, model: m } : c)),
+        );
+      }
+    },
+    [activeId],
+  );
 
   // ─── Conversation actions ───
   const newChat = useCallback(() => {
@@ -180,6 +239,9 @@ export default function Page() {
       // convId is finalized; bail if that conversation already has a job running.
       if (!convId || streamingConvs.has(convId)) return;
 
+      // Non-privileged accounts are always script-only, no matter the toggle.
+      const effectiveScriptOnly = canUseCpu ? scriptOnly : true;
+
       const userMsg: Message = {
         id: nanoid(8),
         role: "user",
@@ -201,6 +263,8 @@ export default function Page() {
                 title: c.title || text.slice(0, 40),
                 messages: [...c.messages, userMsg, assistantMsg],
                 updatedAt: Date.now(),
+                model,
+                scriptOnly: effectiveScriptOnly,
               }
             : c,
         ),
@@ -284,10 +348,10 @@ export default function Page() {
           // refund or revealed a balance change.
           auth.refresh();
         },
-      });
+      }, { model, scriptOnly: effectiveScriptOnly });
       jobHandles.current.set(convId, handle);
     },
-    [input, activeId, active, backendUrl, auth, streamingConvs],
+    [input, activeId, active, backendUrl, auth, streamingConvs, canUseCpu, model, scriptOnly],
   );
 
   // Regenerate: drop the trailing assistant msg (and trailing user-only artifacts)
@@ -421,6 +485,11 @@ export default function Page() {
             lastUserMessage={
               [...(active?.messages ?? [])].reverse().find((m) => m.role === "user")?.content
             }
+            model={model}
+            onModelChange={onModelChange}
+            scriptOnly={scriptOnly}
+            onToggleScriptOnly={onToggleScriptOnly}
+            canUseCpu={canUseCpu}
           />
           <div
             className="text-center text-xs mt-1.5"
