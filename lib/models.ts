@@ -16,6 +16,9 @@ export const MODELS: ModelOption[] = [
   { id: "gpt-5-nano", label: "GPT-5 nano", hint: "Cheapest" },
   { id: "gpt-4o", label: "GPT-4o", hint: "Balanced (default)" },
   { id: "gpt-4o-mini", label: "GPT-4o mini", hint: "Cheap" },
+  { id: "claude-opus-4-8", label: "Claude Opus 4.8", hint: "Anthropic flagship (pricey)" },
+  { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", hint: "Anthropic balanced" },
+  { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", hint: "Anthropic cheap" },
 ];
 
 export const DEFAULT_MODEL = "gpt-4o";
