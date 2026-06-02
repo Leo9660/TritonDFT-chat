@@ -28,6 +28,17 @@ interface Props {
 
 const ERROR_TAGS = new Set(["error", "exception", "fatal"]);
 
+/* The agent prints its [tag] markers WITHOUT reliable newlines between them, so
+ * they show up concatenated mid-line (e.g. "Parsed 1 steps.[run] Executing…").
+ * We scan for these markers anywhere in the text — restricted to known tags so
+ * we don't split on JSON brackets or "[0]" inside output. */
+const KNOWN_TAGS = new Set([
+  "dftagent", "info_query", "mp", "plan", "run", "solve_sub_problem", "runner",
+  "parser", "eval", "benchmark", "executor", "analyzer", "refiner", "system",
+  "auto_parallel", "slurm", "error", "exception", "fatal", "warning",
+]);
+const TAG_RE = /\[([A-Za-z][A-Za-z_]+)\]/g;
+
 /* ─── raw [tag] body line, parsed in order ─── */
 interface RawStep {
   tag: string;
@@ -91,15 +102,25 @@ function parseRawSteps(conv: Conversation | null): { steps: RawStep[]; runOf: Ma
   const assistants = conv.messages.filter((m) => m.role === "assistant");
   assistants.forEach((msg, ai) => {
     const runIndex = ai + 1;
-    for (const line of msg.content.split("\n")) {
-      const m = line.match(/^\[(\w+)\]\s*(.*)$/);
-      if (!m) continue;
+    const content = msg.content;
+    // Find every known [tag] marker anywhere in the text, then take each step's
+    // body as the slice from after its marker up to the next marker.
+    const marks: { tag: string; at: number; after: number }[] = [];
+    TAG_RE.lastIndex = 0;
+    let mm: RegExpExecArray | null;
+    while ((mm = TAG_RE.exec(content)) !== null) {
+      if (KNOWN_TAGS.has(mm[1].toLowerCase())) {
+        marks.push({ tag: mm[1], at: mm.index, after: TAG_RE.lastIndex });
+      }
+    }
+    for (let i = 0; i < marks.length; i++) {
+      const end = i + 1 < marks.length ? marks[i + 1].at : content.length;
       rawIndex += 1;
       runOf.set(rawIndex, runIndex);
       out.push({
-        tag: m[1],
-        body: (m[2] || "").trim(),
-        isError: ERROR_TAGS.has(m[1].toLowerCase()),
+        tag: marks[i].tag,
+        body: content.slice(marks[i].after, end).trim(),
+        isError: ERROR_TAGS.has(marks[i].tag.toLowerCase()),
         rawIndex,
         firstSeenAt: 0,
       });
