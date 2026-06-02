@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImageIcon, SendIcon, SquareIcon, CpuIcon, FileCodeIcon, ChevronDownIcon } from "lucide-react";
+import { ImageIcon, SendIcon, SquareIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { MODELS } from "@/lib/models";
 
 interface Props {
   value: string;
@@ -13,19 +12,9 @@ interface Props {
   isStreaming: boolean;
   /** Most-recent user message in the active conversation — used by ArrowUp recall. */
   lastUserMessage?: string;
-  // Model + CPU controls
-  model: string;
-  onModelChange: (m: string) => void;
-  scriptOnly: boolean;
-  onToggleScriptOnly: () => void;
-  /** Only admins / unlimited accounts may run CPU; others are locked to script-only. */
-  canUseCpu: boolean;
 }
 
-export function ChatInput({
-  value, onChange, onSend, onStop, isStreaming, lastUserMessage,
-  model, onModelChange, scriptOnly, onToggleScriptOnly, canUseCpu,
-}: Props) {
+export function ChatInput({ value, onChange, onSend, onStop, isStreaming, lastUserMessage }: Props) {
   const { t } = useTranslation();
   const ref = useRef<HTMLTextAreaElement>(null);
   const [focused, setFocused] = useState(false);
@@ -60,10 +49,8 @@ export function ChatInput({
   }
 
   const canSend = value.trim() && !isStreaming;
-  const cpuOn = canUseCpu && !scriptOnly;
 
   return (
-    <div className="flex flex-col gap-1.5">
     <div
       className="flex gap-2 rounded-2xl p-2 items-end transition"
       style={{
@@ -142,75 +129,6 @@ export function ChatInput({
           <SendIcon size={18} />
         </button>
       )}
-    </div>
-
-    {/* Controls: model + execution mode */}
-    <div className="flex items-center gap-2 px-1" style={{ fontSize: 12 }}>
-      <div
-        className="relative inline-flex items-center"
-        title="Model — billed by OpenAI price × tokens"
-      >
-        <select
-          value={model}
-          onChange={(e) => onModelChange(e.target.value)}
-          disabled={isStreaming}
-          className="appearance-none rounded-lg pl-2.5 pr-7 py-1 outline-none cursor-pointer"
-          style={{
-            background: "var(--bg-1)",
-            color: "var(--fg-mute)",
-            border: "1px solid var(--border)",
-            fontSize: 12,
-            fontFamily: "var(--font-mono)",
-          }}
-        >
-          {MODELS.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label} · {m.hint}
-            </option>
-          ))}
-        </select>
-        <ChevronDownIcon
-          size={13}
-          style={{ position: "absolute", right: 7, pointerEvents: "none", color: "var(--fg-dim)" }}
-        />
-      </div>
-
-      {canUseCpu ? (
-        <button
-          type="button"
-          onClick={onToggleScriptOnly}
-          disabled={isStreaming}
-          title={cpuOn
-            ? "CPU run: executes the DFT calculation"
-            : "Script-only: generates inputs without running them"}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition"
-          style={{
-            border: "1px solid var(--border)",
-            background: cpuOn ? "rgba(34,197,94,0.12)" : "var(--bg-1)",
-            color: cpuOn ? "#22c55e" : "var(--fg-mute)",
-            cursor: isStreaming ? "not-allowed" : "pointer",
-            fontWeight: 600,
-          }}
-        >
-          {cpuOn ? <CpuIcon size={13} /> : <FileCodeIcon size={13} />}
-          {cpuOn ? "CPU run" : "Script-only"}
-        </button>
-      ) : (
-        <span
-          title="Your account generates input scripts only. Running on CPU requires an admin."
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1"
-          style={{
-            border: "1px solid var(--border)",
-            background: "var(--bg-1)",
-            color: "var(--fg-dim)",
-            fontWeight: 600,
-          }}
-        >
-          <FileCodeIcon size={13} />
-          Script-only
-        </span>
-      )}
-    </div>
     </div>
   );
 }

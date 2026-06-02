@@ -464,6 +464,12 @@ export default function Page() {
           onTogglePanel={() => setPanelOpen((x) => !x)}
           onExport={() => { if (active) downloadMarkdown(active); }}
           onCopy={async () => { if (active) await copyMarkdown(active); }}
+          model={model}
+          onModelChange={onModelChange}
+          scriptOnly={scriptOnly}
+          onToggleScriptOnly={onToggleScriptOnly}
+          canUseCpu={canUseCpu}
+          controlsDisabled={activeStreaming}
         />
         {showEmpty ? (
           <EmptyState onPrompt={(text) => sendMessage(text)} />
@@ -485,11 +491,6 @@ export default function Page() {
             lastUserMessage={
               [...(active?.messages ?? [])].reverse().find((m) => m.role === "user")?.content
             }
-            model={model}
-            onModelChange={onModelChange}
-            scriptOnly={scriptOnly}
-            onToggleScriptOnly={onToggleScriptOnly}
-            canUseCpu={canUseCpu}
           />
           <div
             className="text-center text-xs mt-1.5"

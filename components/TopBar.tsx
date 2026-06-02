@@ -1,8 +1,11 @@
 "use client";
 
-import { SettingsIcon, GlobeIcon, ExternalLinkIcon } from "lucide-react";
+import {
+  SettingsIcon, GlobeIcon, ExternalLinkIcon, ChevronDownIcon, CpuIcon, FileCodeIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Lang } from "@/lib/types";
+import { MODELS } from "@/lib/models";
 import { ChatMenu } from "./ChatMenu";
 import { UserMenu } from "./UserMenu";
 
@@ -15,6 +18,13 @@ interface Props {
   onTogglePanel: () => void;
   onExport: () => void;
   onCopy: () => Promise<void>;
+  // Per-conversation model + execution mode (regular accounts are script-only).
+  model: string;
+  onModelChange: (m: string) => void;
+  scriptOnly: boolean;
+  onToggleScriptOnly: () => void;
+  canUseCpu: boolean;
+  controlsDisabled: boolean;
 }
 
 export function TopBar({
@@ -26,8 +36,15 @@ export function TopBar({
   onTogglePanel,
   onExport,
   onCopy,
+  model,
+  onModelChange,
+  scriptOnly,
+  onToggleScriptOnly,
+  canUseCpu,
+  controlsDisabled,
 }: Props) {
   const { t } = useTranslation();
+  const cpuOn = canUseCpu && !scriptOnly;
   return (
     <header
       className="relative z-50 flex items-center justify-between px-4 py-2 border-b backdrop-blur-md"
@@ -68,6 +85,75 @@ export function TopBar({
           Beta
         </span>
       </div>
+
+      {/* center: per-conversation model + execution mode */}
+      <div
+        className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2"
+        style={{ fontSize: 12 }}
+      >
+        <div className="relative inline-flex items-center" title="Model — billed by OpenAI/Anthropic price × tokens">
+          <select
+            value={model}
+            onChange={(e) => onModelChange(e.target.value)}
+            disabled={controlsDisabled}
+            className="appearance-none rounded-lg pl-2.5 pr-7 py-1 outline-none cursor-pointer"
+            style={{
+              background: "var(--bg-1)",
+              color: "var(--fg-mute)",
+              border: "1px solid var(--border)",
+              fontSize: 12,
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            {MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label} · {m.hint}
+              </option>
+            ))}
+          </select>
+          <ChevronDownIcon
+            size={13}
+            style={{ position: "absolute", right: 7, pointerEvents: "none", color: "var(--fg-dim)" }}
+          />
+        </div>
+
+        {canUseCpu ? (
+          <button
+            type="button"
+            onClick={onToggleScriptOnly}
+            disabled={controlsDisabled}
+            title={cpuOn
+              ? "CPU run: executes the DFT calculation"
+              : "Script-only: generates inputs without running them"}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 transition"
+            style={{
+              border: "1px solid var(--border)",
+              background: cpuOn ? "rgba(34,197,94,0.12)" : "var(--bg-1)",
+              color: cpuOn ? "#22c55e" : "var(--fg-mute)",
+              cursor: controlsDisabled ? "not-allowed" : "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {cpuOn ? <CpuIcon size={13} /> : <FileCodeIcon size={13} />}
+            {cpuOn ? "CPU run" : "Script-only"}
+          </button>
+        ) : (
+          <span
+            title="Your account generates input scripts only. Running on CPU requires an admin."
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1"
+            style={{
+              border: "1px solid var(--border)",
+              background: "var(--bg-1)",
+              color: "var(--fg-dim)",
+              fontWeight: 600,
+            }}
+          >
+            <FileCodeIcon size={13} />
+            Script-only
+          </span>
+        )}
+      </div>
+
       <div className="flex items-center gap-1">
         <a
           href="https://tritondft.com"
