@@ -53,9 +53,10 @@ export default function Page() {
   const [prompts, setPrompts] = useState<PromptTemplate[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState("");
-  // Composer selection (model + execution mode), per-conversation.
-  const [model, setModel] = useState<string>(DEFAULT_MODEL);
-  const [scriptOnly, setScriptOnly] = useState<boolean>(true);
+  // Composer selection (model + execution mode). The active CONVERSATION is the
+  // source of truth once it exists; these drafts only seed a brand-new chat.
+  const [draftModel, setDraftModel] = useState<string>(DEFAULT_MODEL);
+  const [draftScriptOnly, setDraftScriptOnly] = useState<boolean>(true);
   // Only admins / unlimited accounts may run CPU; everyone else is script-only.
   const canUseCpu = !!(auth.user?.is_admin || auth.user?.is_unlimited);
   // Per-conversation streaming state — the backend queue is concurrent, so
@@ -97,10 +98,11 @@ export default function Page() {
     setScopeReady(true);
   }, [userKey, auth.loading]);
 
-  // Default execution mode per account: regular users are locked to script-only;
-  // admins / unlimited default to CPU on.
+  // Default execution mode for NEW chats: regular users are locked to
+  // script-only; admins / unlimited default to CPU on. (Only seeds the draft —
+  // existing conversations keep whatever mode they were sent with.)
   useEffect(() => {
-    setScriptOnly(!canUseCpu);
+    setDraftScriptOnly(!canUseCpu);
   }, [canUseCpu]);
 
   useEffect(() => {
@@ -121,35 +123,31 @@ export default function Page() {
   // Is the currently-viewed conversation streaming? (drives input disable etc.)
   const activeStreaming = activeId != null && streamingConvs.has(activeId);
 
-  // When switching conversations, restore that chat's saved model / mode.
-  useEffect(() => {
-    const c = conversations.find((x) => x.id === activeId);
-    if (!c) return;
-    if (c.model) setModel(c.model);
-    if (typeof c.scriptOnly === "boolean" && canUseCpu) setScriptOnly(c.scriptOnly);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId]);
+  // Effective model + mode: the active conversation wins; otherwise the draft.
+  // Non-privileged accounts are always script-only, no matter what's stored.
+  const model = active?.model ?? draftModel;
+  const scriptOnly = canUseCpu ? (active?.scriptOnly ?? draftScriptOnly) : true;
 
   const onToggleScriptOnly = useCallback(() => {
     if (!canUseCpu) return;
-    setScriptOnly((s) => {
-      const next = !s;
-      if (activeId) {
-        setConversations((cs) =>
-          cs.map((c) => (c.id === activeId ? { ...c, scriptOnly: next } : c)),
-        );
-      }
-      return next;
-    });
-  }, [canUseCpu, activeId]);
+    const next = !scriptOnly;
+    if (activeId) {
+      setConversations((cs) =>
+        cs.map((c) => (c.id === activeId ? { ...c, scriptOnly: next } : c)),
+      );
+    } else {
+      setDraftScriptOnly(next);
+    }
+  }, [canUseCpu, activeId, scriptOnly]);
 
   const onModelChange = useCallback(
     (m: string) => {
-      setModel(m);
       if (activeId) {
         setConversations((cs) =>
           cs.map((c) => (c.id === activeId ? { ...c, model: m } : c)),
         );
+      } else {
+        setDraftModel(m);
       }
     },
     [activeId],

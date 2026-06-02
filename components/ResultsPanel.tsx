@@ -91,7 +91,11 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
   return (
     <div
       className="mt-3 rounded-xl overflow-hidden"
-      style={{ background: "var(--bg-1)", border: "1px solid var(--border)" }}
+      style={{
+        background: "var(--bg-1)",
+        border: "1px solid var(--border)",
+        animation: "slide-in-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) both",
+      }}
     >
       {/* header */}
       <button
