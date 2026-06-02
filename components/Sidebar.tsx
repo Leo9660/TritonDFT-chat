@@ -118,29 +118,8 @@ export function Sidebar(props: Props) {
       className="w-64 shrink-0 flex flex-col border-r"
       style={{ background: "var(--bg-1)", borderColor: "var(--border)" }}
     >
-      {/* Action buttons */}
-      <div className="p-3 border-b flex flex-col gap-2" style={{ borderColor: "var(--border)" }}>
-        <button
-          onClick={onNew}
-          className="w-full flex items-center gap-2 justify-center py-2.5 rounded-lg text-white font-medium text-sm transition"
-          style={{
-            background: "var(--grad-primary)",
-            boxShadow: "0 0 0 1px rgba(255,255,255,0.1) inset",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
-          onMouseLeave={(e) => (e.currentTarget.style.transform = "")}
-        >
-          <PlusIcon size={16} />
-          {t("newChat")}
-        </button>
-        <div className="grid grid-cols-2 gap-2">
-          <SecondaryButton onClick={onNewFolder} icon={<FolderPlusIcon size={13} />} label={t("newFolder")} />
-          <SecondaryButton onClick={onOpenPrompts} icon={<BookOpenIcon size={13} />} label={t("prompts")} />
-        </div>
-      </div>
-
-      {/* Model + run mode (per conversation) — one row */}
-      <div className="px-3 py-2.5 border-b flex items-center gap-2" style={{ borderColor: "var(--border)" }}>
+      {/* Model + run mode (per conversation) — one row, above New chat */}
+      <div className="px-3 pt-3 pb-2.5 border-b flex items-center gap-2" style={{ borderColor: "var(--border)" }}>
         <div className="relative flex-1 min-w-0">
           <select
             value={model}
@@ -208,6 +187,27 @@ export function Sidebar(props: Props) {
             Script
           </span>
         )}
+      </div>
+
+      {/* Action buttons */}
+      <div className="p-3 border-b flex flex-col gap-2" style={{ borderColor: "var(--border)" }}>
+        <button
+          onClick={onNew}
+          className="w-full flex items-center gap-2 justify-center py-2.5 rounded-lg text-white font-medium text-sm transition"
+          style={{
+            background: "var(--grad-primary)",
+            boxShadow: "0 0 0 1px rgba(255,255,255,0.1) inset",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "")}
+        >
+          <PlusIcon size={16} />
+          {t("newChat")}
+        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <SecondaryButton onClick={onNewFolder} icon={<FolderPlusIcon size={13} />} label={t("newFolder")} />
+          <SecondaryButton onClick={onOpenPrompts} icon={<BookOpenIcon size={13} />} label={t("prompts")} />
+        </div>
       </div>
 
       {/* Search */}

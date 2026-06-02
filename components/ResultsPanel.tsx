@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DownloadIcon, FileTextIcon, XIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import {
   JobDetail, JobFile, BandData,
@@ -25,6 +25,7 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
   const [fileText, setFileText] = useState<string>("");
   const [fileLoading, setFileLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +48,17 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
       cancelled = true;
     };
   }, [jobId]);
+
+  // The panel renders after an async fetch — by then the chat's own
+  // bottom-pin has already fired, so the page doesn't follow. Once content is
+  // in, smoothly bring the panel into view so the user sees the result appear.
+  useEffect(() => {
+    if (loading) return;
+    const id = requestAnimationFrame(() => {
+      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [loading]);
 
   async function viewFile(name: string) {
     if (openFile === name) {
@@ -90,6 +102,7 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
 
   return (
     <div
+      ref={rootRef}
       className="mt-3 rounded-xl overflow-hidden"
       style={{
         background: "var(--bg-1)",
