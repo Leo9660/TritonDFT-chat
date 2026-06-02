@@ -139,20 +139,14 @@ export function Sidebar(props: Props) {
         </div>
       </div>
 
-      {/* Model + run mode (per conversation) */}
-      <div className="px-3 py-2.5 border-b flex flex-col gap-2" style={{ borderColor: "var(--border)" }}>
-        <span
-          className="text-[10px] uppercase tracking-wider"
-          style={{ color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}
-        >
-          Model
-        </span>
-        <div className="relative">
+      {/* Model + run mode (per conversation) — one row */}
+      <div className="px-3 py-2.5 border-b flex items-center gap-2" style={{ borderColor: "var(--border)" }}>
+        <div className="relative flex-1 min-w-0">
           <select
             value={model}
             onChange={(e) => onModelChange(e.target.value)}
             disabled={controlsDisabled}
-            className="w-full appearance-none rounded-lg pl-2.5 pr-7 py-1.5 outline-none cursor-pointer"
+            className="w-full appearance-none rounded-lg pl-2.5 pr-7 py-1.5 outline-none cursor-pointer truncate"
             style={{
               background: "var(--bg-0)",
               color: "var(--fg)",
@@ -187,7 +181,7 @@ export function Sidebar(props: Props) {
             title={cpuOn
               ? "CPU run: executes the DFT calculation"
               : "Script-only: generates the inputs without running them"}
-            className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs transition"
+            className="shrink-0 whitespace-nowrap flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs transition"
             style={{
               border: "1px solid var(--border)",
               background: cpuOn ? "rgba(34,197,94,0.12)" : "var(--bg-0)",
@@ -197,12 +191,12 @@ export function Sidebar(props: Props) {
             }}
           >
             {cpuOn ? <CpuIcon size={13} /> : <FileCodeIcon size={13} />}
-            {cpuOn ? "CPU run" : "Script-only"}
+            {cpuOn ? "CPU" : "Script"}
           </button>
         ) : (
           <span
             title="Your account generates input scripts only. Running on CPU requires an admin."
-            className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs"
+            className="shrink-0 whitespace-nowrap flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs"
             style={{
               border: "1px solid var(--border)",
               background: "var(--bg-0)",
@@ -211,7 +205,7 @@ export function Sidebar(props: Props) {
             }}
           >
             <FileCodeIcon size={13} />
-            Script-only
+            Script
           </span>
         )}
       </div>
