@@ -163,7 +163,7 @@ export function Sidebar(props: Props) {
           >
             {MODELS.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.label} · {m.hint}
+                {m.label}
               </option>
             ))}
           </select>
