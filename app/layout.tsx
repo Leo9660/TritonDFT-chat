@@ -23,7 +23,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <meta name="deploy-test" content="dpltest-7q2x9" />
         {/* Security headers (static host can't set HTTP headers, so meta).
             The key directive is connect-src: even if something injected script,
             it could not fetch the JWT out to an attacker origin. */}
