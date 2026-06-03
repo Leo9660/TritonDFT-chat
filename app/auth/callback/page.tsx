@@ -15,6 +15,11 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const url = new URL(window.location.href);
     const token = url.searchParams.get("token");
+    // Scrub the token from the visible URL + history immediately so it can't
+    // leak via Referer headers or be recovered from browser history.
+    if (window.location.search) {
+      window.history.replaceState(null, "", "/auth/callback/");
+    }
     if (!token) {
       setState({ kind: "error", msg: tr({ code: "magic_link_invalid", message: "" }) });
       return;

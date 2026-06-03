@@ -23,6 +23,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        {/* Security headers (static host can't set HTTP headers, so meta).
+            The key directive is connect-src: even if something injected script,
+            it could not fetch the JWT out to an attacker origin. */}
+        <meta name="referrer" content="no-referrer" />
+        <meta
+          httpEquiv="Content-Security-Policy"
+          content={[
+            "default-src 'self'",
+            "connect-src 'self' https://tritondft.nrp-nautilus.io",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' https://fonts.gstatic.com data:",
+            "img-src 'self' data:",
+            "object-src 'none'",
+            "base-uri 'none'",
+            "form-action 'self'",
+          ].join("; ")}
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
