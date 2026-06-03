@@ -25,6 +25,7 @@ export interface User {
   credits: number;
   is_admin: boolean;
   is_unlimited?: boolean;
+  can_use_cpu?: boolean;
 }
 
 export function loadToken(): string | null {

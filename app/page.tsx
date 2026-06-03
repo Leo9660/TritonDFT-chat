@@ -57,8 +57,10 @@ export default function Page() {
   // source of truth once it exists; these drafts only seed a brand-new chat.
   const [draftModel, setDraftModel] = useState<string>(DEFAULT_MODEL);
   const [draftScriptOnly, setDraftScriptOnly] = useState<boolean>(true);
-  // Only admins / unlimited accounts may run CPU; everyone else is script-only.
-  const canUseCpu = !!(auth.user?.is_admin || auth.user?.is_unlimited);
+  // Admins, unlimited, and CPU-granted accounts may run CPU; others are script-only.
+  const canUseCpu = !!(
+    auth.user?.is_admin || auth.user?.is_unlimited || auth.user?.can_use_cpu
+  );
   // Per-conversation streaming state — the backend queue is concurrent, so
   // different conversations can each have a job running at the same time.
   const [streamingConvs, setStreamingConvs] = useState<Set<string>>(new Set());

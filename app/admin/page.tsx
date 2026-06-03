@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeftIcon, BanIcon, CheckCircle2Icon, InfinityIcon, PencilIcon, RefreshCwIcon, ShieldIcon } from "lucide-react";
+import { ArrowLeftIcon, BanIcon, CheckCircle2Icon, CpuIcon, InfinityIcon, PencilIcon, RefreshCwIcon, ShieldIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { authFetch } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
@@ -14,6 +14,7 @@ interface AdminUser {
   is_admin: boolean;
   is_banned: boolean;
   is_unlimited: boolean;
+  can_use_cpu: boolean;
   created_at: string;
   last_login_at: string | null;
 }
@@ -268,6 +269,7 @@ export default function AdminPage() {
                     <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 4 }}>
                       {u.is_admin && <Badge color="amber" label="admin" />}
                       {u.is_unlimited && <Badge color="green" label="unlimited" />}
+                      {u.can_use_cpu && !u.is_unlimited && <Badge color="blue" label="cpu" />}
                       {u.is_banned && <Badge color="red" label="banned" />}
                     </span>
                   </td>
@@ -283,7 +285,13 @@ export default function AdminPage() {
                         color={u.is_banned ? "#22c55e" : "#ef4444"}
                       />
                       <ActionBtn
-                        title={u.is_unlimited ? "Remove whitelist" : "Add to whitelist"}
+                        title={u.can_use_cpu ? "Revoke CPU access" : "Grant CPU access (credits still charged)"}
+                        onClick={() => patchUser(u.email, { can_use_cpu: !u.can_use_cpu })}
+                        icon={<CpuIcon size={13} />}
+                        color={u.can_use_cpu ? "var(--fg-dim)" : "#22c55e"}
+                      />
+                      <ActionBtn
+                        title={u.is_unlimited ? "Remove whitelist (unlimited credits)" : "Add to whitelist (unlimited credits + CPU)"}
                         onClick={() => patchUser(u.email, { is_unlimited: !u.is_unlimited })}
                         icon={<InfinityIcon size={13} />}
                         color={u.is_unlimited ? "var(--fg-dim)" : "var(--amber-500, #f59e0b)"}
@@ -331,11 +339,12 @@ const td: React.CSSProperties = {
   verticalAlign: "middle",
 };
 
-function Badge({ color, label }: { color: "amber" | "green" | "red"; label: string }) {
+function Badge({ color, label }: { color: "amber" | "green" | "red" | "blue"; label: string }) {
   const palette: Record<string, { bg: string; fg: string }> = {
     amber: { bg: "rgba(245, 158, 11, 0.15)", fg: "#f59e0b" },
     green: { bg: "rgba(34, 197, 94, 0.15)", fg: "#22c55e" },
     red: { bg: "rgba(239, 68, 68, 0.15)", fg: "#ef4444" },
+    blue: { bg: "rgba(69, 119, 255, 0.15)", fg: "#4577ff" },
   };
   const p = palette[color];
   return (
