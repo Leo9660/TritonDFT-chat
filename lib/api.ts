@@ -1,4 +1,4 @@
-import { Message } from "./types";
+import { Message, Mode, PendingStep } from "./types";
 import { ApiError, loadToken, authFetch } from "./auth";
 import { parseError, ParsedError } from "./errors";
 
@@ -12,6 +12,11 @@ export interface JobCallbacks {
   onError: (err: Error) => void;
   /** 401/402/403/etc — receives the parsed error for translated UI messages. */
   onApiError?: (err: ParsedError) => void;
+  /**
+   * Assistant mode: a step's script is paused awaiting the user's review.
+   * Fires once per distinct pending step (deduped by step + attempt).
+   */
+  onApproval?: (pending: PendingStep, jobId: string) => void;
 }
 
 export interface JobHandle {
@@ -42,6 +47,7 @@ function authHeaders(): Record<string, string> {
 export interface JobOptions {
   model?: string;
   scriptOnly?: boolean;
+  mode?: Mode;
 }
 
 export function runJob(
@@ -61,6 +67,7 @@ export function runJob(
   let displayed = 0;                                // chars revealed so far
   let phase: "queued" | "running" | "terminal" = "queued";
   let lastSent: string | null = null;
+  let lastPendingKey: string | null = null;         // dedupe onApproval fires
 
   function fail(status: number, txt: string) {
     const parsed = parseError(status, txt);
@@ -128,6 +135,22 @@ export function runJob(
         target = data.output || "";
         ensureTyping();
         pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
+      } else if (data.status === "awaiting_approval") {
+        // Assistant mode: a step's script is waiting for the user. Keep the
+        // output flowing and surface the pending step (once per step/attempt),
+        // and keep polling so we resume automatically once the user acts.
+        phase = "running";
+        target = data.output || "";
+        ensureTyping();
+        const p = data.pending_step as PendingStep | null;
+        if (p) {
+          const key = `${p.step_index}:${p.attempt}`;
+          if (key !== lastPendingKey) {
+            lastPendingKey = key;
+            cb.onApproval?.(p, jobId as string);
+          }
+        }
+        pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
       } else {
         // Terminal: done | failed | timeout | cancelled
         let full = data.output || "";
@@ -152,6 +175,7 @@ export function runJob(
           messages: messages.map(({ role, content }) => ({ role, content })),
           ...(opts.model ? { model: opts.model } : {}),
           ...(opts.scriptOnly != null ? { script_only: opts.scriptOnly } : {}),
+          ...(opts.mode ? { mode: opts.mode } : {}),
         }),
       });
       if (!resp.ok) {
@@ -186,6 +210,23 @@ export function runJob(
       cb.onDone(jobId);
     },
   };
+}
+
+// ───── Assistant mode: submit a decision for a paused step ─────
+
+export type StepAction =
+  | { action: "approve"; scripts?: { filename: string; content: string }[] }
+  | { action: "suggest"; suggestion: string }
+  | { action: "cancel" };
+
+/** Submit the user's decision for a step awaiting review (assistant mode).
+ * The job resumes server-side; the still-running poll loop picks it up. */
+export async function submitStepAction(jobId: string, body: StepAction): Promise<void> {
+  const r = await authFetch(`/jobs/${jobId}/step-action`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
 }
 
 // ───── Artifacts: fetch a finished job's results & files ─────

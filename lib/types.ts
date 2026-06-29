@@ -9,6 +9,25 @@ export interface Message {
   jobId?: string;
 }
 
+/** auto = run end-to-end; assistant = pause for human review before each step. */
+export type Mode = "auto" | "assistant";
+
+export interface PendingScript {
+  filename: string;
+  content: string;
+}
+
+/** A step paused for human review in assistant mode (from GET /jobs/{id}). */
+export interface PendingStep {
+  step_index: number;
+  step_id?: number;
+  total_steps?: number | null;
+  problem: string;
+  tool: string;
+  attempt: number;
+  scripts: PendingScript[];
+}
+
 export interface Conversation {
   id: string;
   title: string;
@@ -20,6 +39,8 @@ export interface Conversation {
   model?: string;
   /** Generate input files without running them on CPU. */
   scriptOnly?: boolean;
+  /** Human-in-the-loop mode for this chat. */
+  mode?: Mode;
 }
 
 export interface Folder {

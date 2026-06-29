@@ -17,9 +17,11 @@ import {
   MoreHorizontalIcon,
   CpuIcon,
   FileCodeIcon,
+  HandIcon,
+  ZapIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Conversation, Folder } from "@/lib/types";
+import { Conversation, Folder, Mode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ModelDropdown } from "./ModelDropdown";
 
@@ -44,6 +46,8 @@ interface Props {
   onToggleScriptOnly: () => void;
   canUseCpu: boolean;
   controlsDisabled: boolean;
+  mode: Mode;
+  onToggleMode: () => void;
 }
 
 function relativeTime(ts: number, locale: string): string {
@@ -93,10 +97,13 @@ export function Sidebar(props: Props) {
     onToggleScriptOnly,
     canUseCpu,
     controlsDisabled,
+    mode,
+    onToggleMode,
   } = props;
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState("");
   const cpuOn = canUseCpu && !scriptOnly;
+  const assistantOn = mode === "assistant";
 
   const filtered = useMemo(() => {
     if (!query.trim()) return conversations;
@@ -118,8 +125,8 @@ export function Sidebar(props: Props) {
       className="w-64 shrink-0 flex flex-col border-r"
       style={{ background: "var(--bg-1)", borderColor: "var(--border)" }}
     >
-      {/* Model + run mode (per conversation) — one row, above New chat */}
-      <div className="px-3 pt-3 pb-2.5 border-b flex items-center gap-2" style={{ borderColor: "var(--border)" }}>
+      {/* Model + run mode + assistant mode (per conversation) — above New chat */}
+      <div className="px-3 pt-3 pb-2.5 border-b flex items-center gap-2 flex-wrap" style={{ borderColor: "var(--border)" }}>
         <ModelDropdown value={model} onChange={onModelChange} disabled={controlsDisabled} />
         {canUseCpu ? (
           <button
@@ -156,6 +163,24 @@ export function Sidebar(props: Props) {
             Script
           </span>
         )}
+        {/* Auto vs assistant (human-in-the-loop) — review each step before it runs */}
+        <button
+          type="button"
+          onClick={onToggleMode}
+          disabled={controlsDisabled}
+          title={assistantOn ? (t("modeAssistantHint") as string) : (t("modeAutoHint") as string)}
+          className="shrink-0 whitespace-nowrap flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs transition"
+          style={{
+            border: "1px solid var(--border)",
+            background: assistantOn ? "rgba(69,119,255,0.14)" : "var(--bg-0)",
+            color: assistantOn ? "var(--blue-500)" : "var(--fg-mute)",
+            fontWeight: 600,
+            cursor: controlsDisabled ? "not-allowed" : "pointer",
+          }}
+        >
+          {assistantOn ? <HandIcon size={13} /> : <ZapIcon size={13} />}
+          {assistantOn ? t("modeAssistant") : t("modeAuto")}
+        </button>
       </div>
 
       {/* Action buttons */}

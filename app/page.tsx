@@ -13,8 +13,9 @@ import { SettingsDialog } from "@/components/SettingsDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { AgentActivityPanel } from "@/components/AgentActivityPanel";
 import { PromptLibrary } from "@/components/PromptLibrary";
+import { ScriptApprovalModal } from "@/components/ScriptApprovalModal";
 
-import { Conversation, Folder, Lang, Message, PromptTemplate } from "@/lib/types";
+import { Conversation, Folder, Lang, Message, PromptTemplate, Mode, PendingStep, PendingScript } from "@/lib/types";
 import {
   loadConversations,
   saveConversations,
@@ -28,7 +29,7 @@ import {
   savePrompts,
   setStorageScope,
 } from "@/lib/storage";
-import { runJob, JobHandle } from "@/lib/api";
+import { runJob, JobHandle, submitStepAction } from "@/lib/api";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { downloadMarkdown, copyMarkdown } from "@/lib/export";
 import { useAuth } from "@/lib/auth-context";
@@ -57,6 +58,11 @@ export default function Page() {
   // source of truth once it exists; these drafts only seed a brand-new chat.
   const [draftModel, setDraftModel] = useState<string>(DEFAULT_MODEL);
   const [draftScriptOnly, setDraftScriptOnly] = useState<boolean>(true);
+  const [draftMode, setDraftMode] = useState<Mode>("auto");
+  // Steps awaiting the user's review, keyed by conversation id (assistant mode).
+  const [approvals, setApprovals] = useState<Map<string, { pending: PendingStep; jobId: string }>>(
+    new Map(),
+  );
   // Admins, unlimited, and CPU-granted accounts may run CPU; others are script-only.
   const canUseCpu = !!(
     auth.user?.is_admin || auth.user?.is_unlimited || auth.user?.can_use_cpu
@@ -129,6 +135,18 @@ export default function Page() {
   // Non-privileged accounts are always script-only, no matter what's stored.
   const model = active?.model ?? draftModel;
   const scriptOnly = canUseCpu ? (active?.scriptOnly ?? draftScriptOnly) : true;
+  const mode: Mode = active?.mode ?? draftMode;
+
+  const onToggleMode = useCallback(() => {
+    const next: Mode = mode === "assistant" ? "auto" : "assistant";
+    if (activeId) {
+      setConversations((cs) =>
+        cs.map((c) => (c.id === activeId ? { ...c, mode: next } : c)),
+      );
+    } else {
+      setDraftMode(next);
+    }
+  }, [mode, activeId]);
 
   const onToggleScriptOnly = useCallback(() => {
     if (!canUseCpu) return;
@@ -265,6 +283,7 @@ export default function Page() {
                 updatedAt: Date.now(),
                 model,
                 scriptOnly: effectiveScriptOnly,
+                mode,
               }
             : c,
         ),
@@ -311,9 +330,17 @@ export default function Page() {
         onUpdate: (output) => {
           setAssistant(output);
         },
+        onApproval: (pending, jobId) => {
+          setApprovals((m) => new Map(m).set(convId, { pending, jobId }));
+        },
         onDone: (jobId) => {
           stopStreamingConv();
           jobHandles.current.delete(convId);
+          setApprovals((m) => {
+            const n = new Map(m);
+            n.delete(convId);
+            return n;
+          });
           // Refresh credits after each completed run
           auth.refresh();
           // Stamp the job id onto the assistant message so ChatMessages can
@@ -348,10 +375,10 @@ export default function Page() {
           // refund or revealed a balance change.
           auth.refresh();
         },
-      }, { model, scriptOnly: effectiveScriptOnly });
+      }, { model, scriptOnly: effectiveScriptOnly, mode });
       jobHandles.current.set(convId, handle);
     },
-    [input, activeId, active, backendUrl, auth, streamingConvs, canUseCpu, model, scriptOnly],
+    [input, activeId, active, backendUrl, auth, streamingConvs, canUseCpu, model, scriptOnly, mode],
   );
 
   // Regenerate: drop the trailing assistant msg (and trailing user-only artifacts)
@@ -375,6 +402,47 @@ export default function Page() {
   const stopStreaming = useCallback(() => {
     if (activeId) jobHandles.current.get(activeId)?.cancel();
   }, [activeId]);
+
+  // ─── Assistant-mode step approval ───
+  const activeApproval = activeId ? approvals.get(activeId) ?? null : null;
+
+  const closeApproval = useCallback((convId: string) => {
+    setApprovals((m) => {
+      const n = new Map(m);
+      n.delete(convId);
+      return n;
+    });
+  }, []);
+
+  const onApproveStep = useCallback(
+    (scripts?: PendingScript[]) => {
+      if (!activeId) return;
+      const a = approvals.get(activeId);
+      if (!a) return;
+      closeApproval(activeId);
+      submitStepAction(a.jobId, { action: "approve", ...(scripts ? { scripts } : {}) }).catch(() => {});
+    },
+    [activeId, approvals, closeApproval],
+  );
+
+  const onSuggestStep = useCallback(
+    (suggestion: string) => {
+      if (!activeId || !suggestion.trim()) return;
+      const a = approvals.get(activeId);
+      if (!a) return;
+      closeApproval(activeId);
+      submitStepAction(a.jobId, { action: "suggest", suggestion }).catch(() => {});
+    },
+    [activeId, approvals, closeApproval],
+  );
+
+  const onCancelStep = useCallback(() => {
+    if (!activeId) return;
+    const a = approvals.get(activeId);
+    if (!a) return;
+    closeApproval(activeId);
+    submitStepAction(a.jobId, { action: "cancel" }).catch(() => {});
+  }, [activeId, approvals, closeApproval]);
 
   const toggleLang = useCallback(() => {
     const next: Lang = lang === "en" ? "zh" : "en";
@@ -459,6 +527,8 @@ export default function Page() {
         onToggleScriptOnly={onToggleScriptOnly}
         canUseCpu={canUseCpu}
         controlsDisabled={activeStreaming}
+        mode={mode}
+        onToggleMode={onToggleMode}
       />
       <main className="flex-1 flex flex-col min-w-0">
         <TopBar
@@ -534,6 +604,13 @@ export default function Page() {
         onClose={() => setPromptsOpen(false)}
         onPick={(text) => setInput(text)}
         onChange={setPrompts}
+      />
+      <ScriptApprovalModal
+        open={!!activeApproval}
+        pending={activeApproval?.pending ?? null}
+        onApprove={onApproveStep}
+        onSuggest={onSuggestStep}
+        onCancel={onCancelStep}
       />
     </div>
   );
