@@ -125,62 +125,81 @@ export function Sidebar(props: Props) {
       className="w-64 shrink-0 flex flex-col border-r"
       style={{ background: "var(--bg-1)", borderColor: "var(--border)" }}
     >
-      {/* Model + run mode + assistant mode (per conversation) — above New chat */}
-      <div className="px-3 pt-3 pb-2.5 border-b flex items-center gap-2 flex-wrap" style={{ borderColor: "var(--border)" }}>
-        <ModelDropdown value={model} onChange={onModelChange} disabled={controlsDisabled} />
-        {canUseCpu ? (
+      {/* Per-conversation options (above New chat) — one labelled row each so a
+          first-time user understands what they're choosing. */}
+      <div className="px-3 pt-3 pb-3 border-b flex flex-col gap-3" style={{ borderColor: "var(--border)" }}>
+        {/* 1. Base model */}
+        <div>
+          <div className="text-xs font-semibold" style={{ color: "var(--fg)" }}>{t("optModelLabel")}</div>
+          <p className="text-[10px] leading-snug mt-0.5 mb-1.5" style={{ color: "var(--fg-dim)" }}>{t("optModelDesc")}</p>
+          <div className="flex">
+            <ModelDropdown value={model} onChange={onModelChange} disabled={controlsDisabled} />
+          </div>
+        </div>
+
+        {/* 2. Run mode — actually run DFT vs script-only */}
+        <div>
+          <div className="text-xs font-semibold" style={{ color: "var(--fg)" }}>{t("optRunLabel")}</div>
+          <p className="text-[10px] leading-snug mt-0.5 mb-1.5" style={{ color: "var(--fg-dim)" }}>{t("optRunDesc")}</p>
+          {canUseCpu ? (
+            <button
+              type="button"
+              onClick={onToggleScriptOnly}
+              disabled={controlsDisabled}
+              title={cpuOn
+                ? "CPU run: executes the DFT calculation"
+                : "Script-only: generates the inputs without running them"}
+              className="w-full justify-center whitespace-nowrap flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs transition"
+              style={{
+                border: "1px solid var(--border)",
+                background: cpuOn ? "rgba(34,197,94,0.12)" : "var(--bg-0)",
+                color: cpuOn ? "#22c55e" : "var(--fg-mute)",
+                fontWeight: 600,
+                cursor: controlsDisabled ? "not-allowed" : "pointer",
+              }}
+            >
+              {cpuOn ? <CpuIcon size={13} /> : <FileCodeIcon size={13} />}
+              {cpuOn ? "CPU" : "Script"}
+            </button>
+          ) : (
+            <span
+              title="Your account generates input scripts only. Running on CPU requires an admin."
+              className="w-full justify-center whitespace-nowrap flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs"
+              style={{
+                border: "1px solid var(--border)",
+                background: "var(--bg-0)",
+                color: "var(--fg-dim)",
+                fontWeight: 600,
+              }}
+            >
+              <FileCodeIcon size={13} />
+              Script
+            </span>
+          )}
+        </div>
+
+        {/* 3. Control — auto vs assistant (human-in-the-loop) */}
+        <div>
+          <div className="text-xs font-semibold" style={{ color: "var(--fg)" }}>{t("optModeLabel")}</div>
+          <p className="text-[10px] leading-snug mt-0.5 mb-1.5" style={{ color: "var(--fg-dim)" }}>{t("optModeDesc")}</p>
           <button
             type="button"
-            onClick={onToggleScriptOnly}
+            onClick={onToggleMode}
             disabled={controlsDisabled}
-            title={cpuOn
-              ? "CPU run: executes the DFT calculation"
-              : "Script-only: generates the inputs without running them"}
-            className="shrink-0 whitespace-nowrap flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs transition"
+            title={assistantOn ? (t("modeAssistantHint") as string) : (t("modeAutoHint") as string)}
+            className="w-full justify-center whitespace-nowrap flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs transition"
             style={{
               border: "1px solid var(--border)",
-              background: cpuOn ? "rgba(34,197,94,0.12)" : "var(--bg-0)",
-              color: cpuOn ? "#22c55e" : "var(--fg-mute)",
+              background: assistantOn ? "rgba(69,119,255,0.14)" : "var(--bg-0)",
+              color: assistantOn ? "var(--blue-500)" : "var(--fg-mute)",
               fontWeight: 600,
               cursor: controlsDisabled ? "not-allowed" : "pointer",
             }}
           >
-            {cpuOn ? <CpuIcon size={13} /> : <FileCodeIcon size={13} />}
-            {cpuOn ? "CPU" : "Script"}
+            {assistantOn ? <HandIcon size={13} /> : <ZapIcon size={13} />}
+            {assistantOn ? t("modeAssistant") : t("modeAuto")}
           </button>
-        ) : (
-          <span
-            title="Your account generates input scripts only. Running on CPU requires an admin."
-            className="shrink-0 whitespace-nowrap flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--bg-0)",
-              color: "var(--fg-dim)",
-              fontWeight: 600,
-            }}
-          >
-            <FileCodeIcon size={13} />
-            Script
-          </span>
-        )}
-        {/* Auto vs assistant (human-in-the-loop) — review each step before it runs */}
-        <button
-          type="button"
-          onClick={onToggleMode}
-          disabled={controlsDisabled}
-          title={assistantOn ? (t("modeAssistantHint") as string) : (t("modeAutoHint") as string)}
-          className="shrink-0 whitespace-nowrap flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs transition"
-          style={{
-            border: "1px solid var(--border)",
-            background: assistantOn ? "rgba(69,119,255,0.14)" : "var(--bg-0)",
-            color: assistantOn ? "var(--blue-500)" : "var(--fg-mute)",
-            fontWeight: 600,
-            cursor: controlsDisabled ? "not-allowed" : "pointer",
-          }}
-        >
-          {assistantOn ? <HandIcon size={13} /> : <ZapIcon size={13} />}
-          {assistantOn ? t("modeAssistant") : t("modeAuto")}
-        </button>
+        </div>
       </div>
 
       {/* Action buttons */}
