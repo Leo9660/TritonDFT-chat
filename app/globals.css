@@ -696,6 +696,79 @@ button:not(:disabled),
   color: #fca5a5;
 }
 
+/* ─── Plan card: the agent's decomposition, rendered as one highlighted block
+   instead of N repeated "[plan]" log rows. ─── */
+.agent-plan-card {
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(124, 158, 255, 0.06);
+  border: 1px solid rgba(124, 158, 255, 0.22);
+  border-left: 3px solid var(--blue-500, #4577ff);
+}
+.agent-plan-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #7c9eff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.agent-plan-count {
+  color: var(--fg-dim);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.agent-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-plan-step {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.agent-plan-idx {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #7c9eff;
+  background: rgba(124, 158, 255, 0.14);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+.agent-plan-tool {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg);
+  font-weight: 600;
+}
+.agent-plan-bin {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-dim);
+}
+.agent-plan-problem {
+  color: var(--fg-mute);
+  flex: 1 1 100%;
+  padding-left: 34px;
+  word-break: break-word;
+}
+.agent-plan-step.is-unknown .agent-plan-tool {
+  color: #fbbf24;
+}
+
 .streaming-cursor {
   display: inline-block;
   width: 0.5em;

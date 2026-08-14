@@ -14,8 +14,9 @@ import { EmptyState } from "@/components/EmptyState";
 import { AgentActivityPanel } from "@/components/AgentActivityPanel";
 import { PromptLibrary } from "@/components/PromptLibrary";
 import { ScriptApprovalModal } from "@/components/ScriptApprovalModal";
+import { PlanReviewModal } from "@/components/PlanReviewModal";
 
-import { Conversation, Folder, Lang, Message, PromptTemplate, Mode, PendingStep, PendingScript } from "@/lib/types";
+import { Conversation, Folder, Lang, Message, PromptTemplate, Mode, PendingStep, PendingScript, PendingPlan } from "@/lib/types";
 import {
   loadConversations,
   saveConversations,
@@ -29,7 +30,7 @@ import {
   savePrompts,
   setStorageScope,
 } from "@/lib/storage";
-import { runJob, JobHandle, submitStepAction } from "@/lib/api";
+import { runJob, JobHandle, submitStepAction, submitPlanAction } from "@/lib/api";
 import { DEFAULT_MODEL } from "@/lib/models";
 import { downloadMarkdown, copyMarkdown } from "@/lib/export";
 import { useAuth } from "@/lib/auth-context";
@@ -61,6 +62,10 @@ export default function Page() {
   const [draftMode, setDraftMode] = useState<Mode>("auto");
   // Steps awaiting the user's review, keyed by conversation id (assistant mode).
   const [approvals, setApprovals] = useState<Map<string, { pending: PendingStep; jobId: string }>>(
+    new Map(),
+  );
+  // Plans awaiting the user's review, keyed by conversation id (assistant mode).
+  const [planReviews, setPlanReviews] = useState<Map<string, { pending: PendingPlan; jobId: string }>>(
     new Map(),
   );
   // Admins, unlimited, and CPU-granted accounts may run CPU; others are script-only.
@@ -333,10 +338,18 @@ export default function Page() {
         onApproval: (pending, jobId) => {
           setApprovals((m) => new Map(m).set(convId, { pending, jobId }));
         },
+        onPlanReview: (pending, jobId) => {
+          setPlanReviews((m) => new Map(m).set(convId, { pending, jobId }));
+        },
         onDone: (jobId) => {
           stopStreamingConv();
           jobHandles.current.delete(convId);
           setApprovals((m) => {
+            const n = new Map(m);
+            n.delete(convId);
+            return n;
+          });
+          setPlanReviews((m) => {
             const n = new Map(m);
             n.delete(convId);
             return n;
@@ -443,6 +456,47 @@ export default function Page() {
     closeApproval(activeId);
     submitStepAction(a.jobId, { action: "cancel" }).catch(() => {});
   }, [activeId, approvals, closeApproval]);
+
+  // ─── Assistant-mode plan review ───
+  const activePlanReview = activeId ? planReviews.get(activeId) ?? null : null;
+
+  const closePlanReview = useCallback((convId: string) => {
+    setPlanReviews((m) => {
+      const n = new Map(m);
+      n.delete(convId);
+      return n;
+    });
+  }, []);
+
+  const onApprovePlan = useCallback(
+    (steps?: { problem: string; tool: string; input: string }[]) => {
+      if (!activeId) return;
+      const p = planReviews.get(activeId);
+      if (!p) return;
+      closePlanReview(activeId);
+      submitPlanAction(p.jobId, { action: "approve", ...(steps ? { steps } : {}) }).catch(() => {});
+    },
+    [activeId, planReviews, closePlanReview],
+  );
+
+  const onSuggestPlan = useCallback(
+    (suggestion: string) => {
+      if (!activeId || !suggestion.trim()) return;
+      const p = planReviews.get(activeId);
+      if (!p) return;
+      closePlanReview(activeId);
+      submitPlanAction(p.jobId, { action: "suggest", suggestion }).catch(() => {});
+    },
+    [activeId, planReviews, closePlanReview],
+  );
+
+  const onCancelPlan = useCallback(() => {
+    if (!activeId) return;
+    const p = planReviews.get(activeId);
+    if (!p) return;
+    closePlanReview(activeId);
+    submitPlanAction(p.jobId, { action: "cancel" }).catch(() => {});
+  }, [activeId, planReviews, closePlanReview]);
 
   const toggleLang = useCallback(() => {
     const next: Lang = lang === "en" ? "zh" : "en";
@@ -605,8 +659,15 @@ export default function Page() {
         onPick={(text) => setInput(text)}
         onChange={setPrompts}
       />
+      <PlanReviewModal
+        open={!!activePlanReview}
+        pending={activePlanReview?.pending ?? null}
+        onApprove={onApprovePlan}
+        onSuggest={onSuggestPlan}
+        onCancel={onCancelPlan}
+      />
       <ScriptApprovalModal
-        open={!!activeApproval}
+        open={!!activeApproval && !activePlanReview}
         pending={activeApproval?.pending ?? null}
         onApprove={onApproveStep}
         onSuggest={onSuggestStep}

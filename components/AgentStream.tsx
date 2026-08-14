@@ -13,6 +13,7 @@
  */
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertTriangleIcon,
   AtomIcon,
@@ -30,9 +31,56 @@ interface Props {
   content: string;
 }
 
+interface PlanLine {
+  index: string;   // "1/4"
+  tool: string;    // "pw_vc_relax"
+  binary: string;  // "pw.x · vc-relax"
+  problem: string;
+  unknown: boolean;
+}
+
 type Block =
   | { kind: "step"; tag: string; body: string; isError: boolean; key: number }
+  | { kind: "plan"; lines: PlanLine[]; key: number }
   | { kind: "markdown"; text: string; key: number };
+
+/* The backend emits one line per planned step:
+ *   [plan] 2/4 · pw_scf (pw.x · scf) — Converge the charge density
+ * Anything that doesn't match (e.g. "Parsed 4 steps.") stays a plain step row. */
+const PLAN_LINE_RE = /^(\d+\/\d+)\s*·\s*(\S+)\s*\(([^)]*)\)\s*[—-]\s*(.*)$/;
+
+function parsePlanLine(body: string): PlanLine | null {
+  const m = body.trim().match(PLAN_LINE_RE);
+  if (!m) return null;
+  const problem = m[4].replace(/\s*\[unknown tool\]\s*$/, "");
+  return {
+    index: m[1],
+    tool: m[2],
+    binary: m[3],
+    problem,
+    unknown: /\[unknown tool\]/.test(m[4]),
+  };
+}
+
+/* Fold consecutive [plan] step-lines into one card, so the plan reads as a
+ * single highlighted block instead of N repeated "Plan" rows. */
+function coalescePlan(blocks: Block[]): Block[] {
+  const out: Block[] = [];
+  for (const b of blocks) {
+    const line = b.kind === "step" && b.tag.toLowerCase() === "plan" ? parsePlanLine(b.body) : null;
+    if (!line) {
+      out.push(b);
+      continue;
+    }
+    const prev = out[out.length - 1];
+    if (prev && prev.kind === "plan") {
+      prev.lines.push(line);
+    } else {
+      out.push({ kind: "plan", lines: [line], key: b.key });
+    }
+  }
+  return out;
+}
 
 const ERROR_TAGS = new Set(["error", "exception", "fatal"]);
 
@@ -122,7 +170,32 @@ function parseBlocks(content: string): Block[] {
   }
   flushStep();
   flushMd();
-  return out;
+  return coalescePlan(out);
+}
+
+function PlanCard({ lines }: { lines: PlanLine[] }) {
+  const { t } = useTranslation();
+  return (
+    <div className="agent-plan-card">
+      <div className="agent-plan-head">
+        <SparklesIcon size={13} />
+        <span className="agent-plan-title">{t("planTitle", { defaultValue: "Plan" })}</span>
+        <span className="agent-plan-count">
+          {t("stepCount", { count: lines.length, defaultValue: `${lines.length} steps` })}
+        </span>
+      </div>
+      <ol className="agent-plan-list">
+        {lines.map((l, i) => (
+          <li key={i} className={`agent-plan-step ${l.unknown ? "is-unknown" : ""}`}>
+            <span className="agent-plan-idx">{l.index}</span>
+            <span className="agent-plan-tool">{l.tool}</span>
+            {l.binary && <span className="agent-plan-bin">{l.binary}</span>}
+            <span className="agent-plan-problem">{l.problem}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 export function AgentStream({ content }: Props) {
@@ -131,6 +204,9 @@ export function AgentStream({ content }: Props) {
   return (
     <div className="agent-stream">
       {blocks.map((b) => {
+        if (b.kind === "plan") {
+          return <PlanCard key={b.key} lines={b.lines} />;
+        }
         if (b.kind === "markdown") {
           return (
             <div key={b.key} className="agent-stream-md">
