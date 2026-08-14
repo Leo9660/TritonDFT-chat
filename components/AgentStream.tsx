@@ -186,10 +186,12 @@ function PlanCard({ lines }: { lines: PlanLine[] }) {
       </div>
       <ol className="agent-plan-list">
         {lines.map((l, i) => (
-          <li key={i} className={`agent-plan-step ${l.unknown ? "is-unknown" : ""}`}>
+          <li key={i} className={`agent-plan-step ${l.unknown ? "is-unknown" : ""}`} title={l.tool}>
             <span className="agent-plan-idx">{l.index}</span>
-            <span className="agent-plan-tool">{l.tool}</span>
-            {l.binary && <span className="agent-plan-bin">{l.binary}</span>}
+            {/* Only the executable + the subproblem's own description. The
+                logical tool name (pw_vc_relax, bands_post, …) is redundant with
+                the executable + mode, so it moves to the hover title. */}
+            <span className="agent-plan-bin">{l.binary || l.tool}</span>
             <span className="agent-plan-problem">{l.problem}</span>
           </li>
         ))}
