@@ -208,19 +208,17 @@ export function PlanReviewModal({ open, pending, onApprove, onSuggest, onCancel 
                 </button>
               </div>
 
+              {/* Only the executable (the dropdown above) and the subproblem's
+                  own description are editable. `input` ("Required input") stays
+                  in state so it round-trips to the backend untouched — showing
+                  it as a second, identical-looking text box just made every step
+                  read as two interchangeable fields. */}
               <input
                 value={s.problem}
                 onChange={(e) => patch(i, "problem", e.target.value)}
                 placeholder={t("planProblemPlaceholder") as string}
-                className="w-full px-2.5 py-1.5 mb-1.5 rounded-md outline-none text-sm"
+                className="w-full px-2.5 py-1.5 rounded-md outline-none text-sm"
                 style={fieldStyle}
-              />
-              <input
-                value={s.input}
-                onChange={(e) => patch(i, "input", e.target.value)}
-                placeholder={t("planInputPlaceholder") as string}
-                className="w-full px-2.5 py-1.5 rounded-md outline-none text-xs"
-                style={{ ...fieldStyle, color: "var(--fg-mute)" }}
               />
             </div>
           ))}
