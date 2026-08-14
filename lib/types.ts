@@ -28,6 +28,28 @@ export interface PendingStep {
   scripts: PendingScript[];
 }
 
+/** One subproblem in the agent's plan (from GET /jobs/{id} → plan / pending_plan). */
+export interface PlanStep {
+  id: number;
+  index: number;
+  problem: string;
+  tool: string;
+  input: string;
+  /** QE binary this tool maps to, e.g. "pw.x" / "bands.x". */
+  exec: string;
+  /** pw.x calculation mode, e.g. "vc-relax" / "bands". Empty for post-processing. */
+  mode: string;
+  description: string;
+  /** False when the tool name isn't in the backend's allowed set. */
+  valid: boolean;
+}
+
+/** A plan paused for human review in assistant mode. */
+export interface PendingPlan {
+  query: string;
+  steps: PlanStep[];
+}
+
 export interface Conversation {
   id: string;
   title: string;

@@ -1,4 +1,4 @@
-import { Message, Mode, PendingStep } from "./types";
+import { Message, Mode, PendingStep, PendingPlan, PlanStep } from "./types";
 import { ApiError, loadToken, authFetch } from "./auth";
 import { parseError, ParsedError } from "./errors";
 
@@ -17,6 +17,14 @@ export interface JobCallbacks {
    * Fires once per distinct pending step (deduped by step + attempt).
    */
   onApproval?: (pending: PendingStep, jobId: string) => void;
+  /**
+   * Assistant mode: the plan is paused awaiting the user's review. Fires once
+   * per distinct plan revision (deduped by the step list itself, so a revision
+   * that changes nothing doesn't re-open the dialog).
+   */
+  onPlanReview?: (pending: PendingPlan, jobId: string) => void;
+  /** The agent's plan, as soon as it exists. Fires in both modes, once. */
+  onPlan?: (steps: PlanStep[]) => void;
 }
 
 export interface JobHandle {
@@ -68,6 +76,8 @@ export function runJob(
   let phase: "queued" | "running" | "terminal" = "queued";
   let lastSent: string | null = null;
   let lastPendingKey: string | null = null;         // dedupe onApproval fires
+  let lastPlanKey: string | null = null;            // dedupe onPlanReview fires
+  let planSent = false;                             // onPlan fires once
 
   function fail(status: number, txt: string) {
     const parsed = parseError(status, txt);
@@ -127,6 +137,13 @@ export function runJob(
       const data = await resp.json();
       if (stopped) return;
 
+      // The plan lands on the job row in both modes — surface it as soon as
+      // it's there, independent of which status the job is in.
+      if (!planSent && Array.isArray(data.plan) && data.plan.length) {
+        planSent = true;
+        cb.onPlan?.(data.plan as PlanStep[]);
+      }
+
       if (data.status === "queued") {
         cb.onQueue?.(data.queue_position ?? 0);
         pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
@@ -134,6 +151,26 @@ export function runJob(
         phase = "running";
         target = data.output || "";
         ensureTyping();
+        pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
+      } else if (data.status === "awaiting_plan") {
+        // Assistant mode: the plan is waiting for the user. Same shape as the
+        // step gate below — keep output flowing and keep polling so we resume
+        // automatically once the user acts.
+        phase = "running";
+        target = data.output || "";
+        ensureTyping();
+        const pp = data.pending_plan as PendingPlan | null;
+        if (pp) {
+          // Key on the plan content: after a "suggest" round the revised plan
+          // must re-open the dialog, but an unchanged one shouldn't.
+          const key = JSON.stringify(
+            (pp.steps || []).map((s) => [s.tool, s.problem, s.input]),
+          );
+          if (key !== lastPlanKey) {
+            lastPlanKey = key;
+            cb.onPlanReview?.(pp, jobId as string);
+          }
+        }
         pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
       } else if (data.status === "awaiting_approval") {
         // Assistant mode: a step's script is waiting for the user. Keep the
@@ -223,6 +260,20 @@ export type StepAction =
  * The job resumes server-side; the still-running poll loop picks it up. */
 export async function submitStepAction(jobId: string, body: StepAction): Promise<void> {
   const r = await authFetch(`/jobs/${jobId}/step-action`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+}
+
+export type PlanAction =
+  | { action: "approve"; steps?: { problem: string; tool: string; input: string }[] }
+  | { action: "suggest"; suggestion: string }
+  | { action: "cancel" };
+
+/** Submit the user's decision for a plan awaiting review (assistant mode). */
+export async function submitPlanAction(jobId: string, body: PlanAction): Promise<void> {
+  const r = await authFetch(`/jobs/${jobId}/plan-action`, {
     method: "POST",
     body: JSON.stringify(body),
   });
