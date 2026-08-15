@@ -25,6 +25,13 @@ export interface JobCallbacks {
   onPlanReview?: (pending: PendingPlan, jobId: string) => void;
   /** The agent's plan, as soon as it exists. Fires in both modes, once. */
   onPlan?: (steps: PlanStep[]) => void;
+  /**
+   * The job id, as soon as the job is created — long before it finishes. Lets
+   * the UI mount the artifacts panel while the run is still going, so the user
+   * can watch the scripts appear instead of staring at a log, and still has
+   * them if they stop the run early.
+   */
+  onJobId?: (jobId: string) => void;
 }
 
 export interface JobHandle {
@@ -221,6 +228,7 @@ export function runJob(
       }
       const data = await resp.json();
       jobId = data.job_id;
+      if (jobId) cb.onJobId?.(jobId);
       if ((data.queue_position ?? 0) > 0) cb.onQueue?.(data.queue_position);
       poll();
     } catch (e) {

@@ -26,10 +26,19 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
   const [fileLoading, setFileLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const settleRef = useRef(0);   // bounded retries after the job goes terminal
 
+  /* The panel now mounts as soon as the job exists, so it has to keep looking
+   * while the run is in flight: inputs appear on disk step by step, and after a
+   * stop the backend needs a moment to record the run directory. A single fetch
+   * on mount showed an empty panel forever in both cases. */
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const TERMINAL = new Set(["done", "failed", "timeout", "cancelled"]);
+
+    async function tick() {
       try {
         const [d, f, b] = await Promise.all([
           fetchJobDetail(jobId).catch(() => null),
@@ -40,12 +49,25 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
         setDetail(d);
         setFiles(f);
         setBands(b);
+        const status = d?.status ?? "";
+        // Keep polling while running. Once terminal, poll a couple more times
+        // only if nothing has landed yet — artifacts are written just after the
+        // status flips, so an immediate final fetch can still come back empty.
+        if (!TERMINAL.has(status)) {
+          timer = setTimeout(tick, 3000);
+        } else if (f.length === 0 && settleRef.current < 4) {
+          settleRef.current += 1;
+          timer = setTimeout(tick, 1500);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    }
+
+    tick();
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, [jobId]);
 

@@ -341,6 +341,24 @@ export default function Page() {
         onPlanReview: (pending, jobId) => {
           setPlanReviews((m) => new Map(m).set(convId, { pending, jobId }));
         },
+        // Stamp the job id as soon as the job exists, so the artifacts panel
+        // mounts and polls during the run. Previously it was only stamped in
+        // onDone, so a user watching a live run — or one who stopped it early —
+        // never saw the scripts, even though they were already on disk.
+        onJobId: (jobId) => {
+          setConversations((cs) =>
+            cs.map((c) =>
+              c.id === convId
+                ? {
+                    ...c,
+                    messages: c.messages.map((m, i) =>
+                      i === c.messages.length - 1 ? { ...m, jobId } : m,
+                    ),
+                  }
+                : c,
+            ),
+          );
+        },
         onDone: (jobId) => {
           stopStreamingConv();
           jobHandles.current.delete(convId);
