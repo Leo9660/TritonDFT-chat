@@ -21,6 +21,7 @@ import {
   ZapIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { LineChart as LineChartIcon } from "lucide-react";
 import { Conversation, Folder, Mode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ModelDropdown } from "./ModelDropdown";
@@ -48,6 +49,8 @@ interface Props {
   controlsDisabled: boolean;
   mode: Mode;
   onToggleMode: () => void;
+  plots: boolean;
+  onTogglePlots: () => void;
 }
 
 function relativeTime(ts: number, locale: string): string {
@@ -99,11 +102,14 @@ export function Sidebar(props: Props) {
     controlsDisabled,
     mode,
     onToggleMode,
+    plots,
+    onTogglePlots,
   } = props;
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState("");
   const cpuOn = canUseCpu && !scriptOnly;
   const assistantOn = mode === "assistant";
+  const plotsOn = !!plots;
 
   const filtered = useMemo(() => {
     if (!query.trim()) return conversations;
@@ -198,6 +204,32 @@ export function Sidebar(props: Props) {
           >
             {assistantOn ? <HandIcon size={13} /> : <ZapIcon size={13} />}
             {assistantOn ? t("modeAssistant") : t("modeAuto")}
+          </button>
+        </div>
+
+        {/* 4. Plots — experimental. Off by default: the extraction is new, and a
+            wrong plot is worse than no plot. Gates the derived result values
+            (band gap, energy) too, so with it off the user sees only the log and
+            the downloadable files. */}
+        <div>
+          <div className="text-xs font-semibold" style={{ color: "var(--fg)" }}>{t("optPlotsLabel")}</div>
+          <p className="text-[10px] leading-snug mt-0.5 mb-1.5" style={{ color: "var(--fg-dim)" }}>{t("optPlotsDesc")}</p>
+          <button
+            type="button"
+            onClick={onTogglePlots}
+            disabled={controlsDisabled}
+            title={t("optPlotsDesc") as string}
+            className="w-full justify-center whitespace-nowrap flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs transition"
+            style={{
+              border: "1px solid var(--border)",
+              background: plotsOn ? "rgba(69,119,255,0.14)" : "var(--bg-0)",
+              color: plotsOn ? "var(--blue-500)" : "var(--fg-mute)",
+              fontWeight: 600,
+              cursor: controlsDisabled ? "not-allowed" : "pointer",
+            }}
+          >
+            <LineChartIcon size={13} />
+            {plotsOn ? t("plotsOn") : t("plotsOff")}
           </button>
         </div>
       </div>

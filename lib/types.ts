@@ -63,6 +63,8 @@ export interface Conversation {
   scriptOnly?: boolean;
   /** Human-in-the-loop mode for this chat. */
   mode?: Mode;
+  /** Experimental: render plots and show extracted values (band gap, energy). */
+  plots?: boolean;
 }
 
 export interface Folder {

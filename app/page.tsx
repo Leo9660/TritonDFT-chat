@@ -60,6 +60,7 @@ export default function Page() {
   const [draftModel, setDraftModel] = useState<string>(DEFAULT_MODEL);
   const [draftScriptOnly, setDraftScriptOnly] = useState<boolean>(true);
   const [draftMode, setDraftMode] = useState<Mode>("auto");
+  const [draftPlots, setDraftPlots] = useState<boolean>(false);
   // Steps awaiting the user's review, keyed by conversation id (assistant mode).
   const [approvals, setApprovals] = useState<Map<string, { pending: PendingStep; jobId: string }>>(
     new Map(),
@@ -141,6 +142,7 @@ export default function Page() {
   const model = active?.model ?? draftModel;
   const scriptOnly = canUseCpu ? (active?.scriptOnly ?? draftScriptOnly) : true;
   const mode: Mode = active?.mode ?? draftMode;
+  const plots: boolean = active?.plots ?? draftPlots;
 
   const onToggleMode = useCallback(() => {
     const next: Mode = mode === "assistant" ? "auto" : "assistant";
@@ -152,6 +154,17 @@ export default function Page() {
       setDraftMode(next);
     }
   }, [mode, activeId]);
+
+  const onTogglePlots = useCallback(() => {
+    const next = !plots;
+    if (activeId) {
+      setConversations((cs) =>
+        cs.map((c) => (c.id === activeId ? { ...c, plots: next } : c)),
+      );
+    } else {
+      setDraftPlots(next);
+    }
+  }, [plots, activeId]);
 
   const onToggleScriptOnly = useCallback(() => {
     if (!canUseCpu) return;
@@ -288,6 +301,7 @@ export default function Page() {
                 updatedAt: Date.now(),
                 model,
                 scriptOnly: effectiveScriptOnly,
+                plots,
                 mode,
               }
             : c,
@@ -406,10 +420,10 @@ export default function Page() {
           // refund or revealed a balance change.
           auth.refresh();
         },
-      }, { model, scriptOnly: effectiveScriptOnly, mode });
+      }, { model, scriptOnly: effectiveScriptOnly, mode, plots });
       jobHandles.current.set(convId, handle);
     },
-    [input, activeId, active, backendUrl, auth, streamingConvs, canUseCpu, model, scriptOnly, mode],
+    [input, activeId, active, backendUrl, auth, streamingConvs, canUseCpu, model, scriptOnly, mode, plots],
   );
 
   // Regenerate: drop the trailing assistant msg (and trailing user-only artifacts)
@@ -601,6 +615,8 @@ export default function Page() {
         controlsDisabled={activeStreaming}
         mode={mode}
         onToggleMode={onToggleMode}
+        plots={plots}
+        onTogglePlots={onTogglePlots}
       />
       <main className="flex-1 flex flex-col min-w-0">
         <TopBar

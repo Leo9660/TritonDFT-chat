@@ -34,6 +34,11 @@ export interface JobCallbacks {
   onJobId?: (jobId: string) => void;
 }
 
+export interface DosData {
+  total?: { x_label: string; e_fermi: number | null; points: [number, number][] };
+  projected?: { label: string; points: [number, number][] }[];
+}
+
 export interface JobHandle {
   /** Stop polling and cancel the job server-side. */
   cancel: () => void;
@@ -63,6 +68,8 @@ export interface JobOptions {
   model?: string;
   scriptOnly?: boolean;
   mode?: Mode;
+  /** Experimental: render plots and surface extracted values. */
+  plots?: boolean;
 }
 
 export function runJob(
@@ -220,6 +227,7 @@ export function runJob(
           ...(opts.model ? { model: opts.model } : {}),
           ...(opts.scriptOnly != null ? { script_only: opts.scriptOnly } : {}),
           ...(opts.mode ? { mode: opts.mode } : {}),
+          ...(opts.plots != null ? { plots: opts.plots } : {}),
         }),
       });
       if (!resp.ok) {
@@ -342,6 +350,18 @@ export async function fetchJobBands(jobId: string): Promise<BandData | null> {
   if (!r.ok) return null;
   const d = await r.json();
   return d.bands || null;
+}
+
+export async function fetchJobDos(jobId: string): Promise<DosData | null> {
+  const r = await authFetch(`/jobs/${jobId}/dos`);
+  if (!r.ok) return null;
+  return (await r.json()).dos ?? null;
+}
+
+export async function fetchJobPhonons(jobId: string): Promise<BandData | null> {
+  const r = await authFetch(`/jobs/${jobId}/phonons`);
+  if (!r.ok) return null;
+  return (await r.json()).phonons ?? null;
 }
 
 export async function fetchJobFileText(jobId: string, name: string): Promise<string> {

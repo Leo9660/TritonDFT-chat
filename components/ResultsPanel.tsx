@@ -3,10 +3,29 @@
 import { useEffect, useRef, useState } from "react";
 import { DownloadIcon, FileTextIcon, XIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import {
-  JobDetail, JobFile, BandData,
-  fetchJobDetail, fetchJobFiles, fetchJobBands, fetchJobFileText, downloadJobZip,
+  JobDetail, JobFile, BandData, DosData,
+  fetchJobDetail, fetchJobFiles, fetchJobBands, fetchJobDos, fetchJobPhonons,
+  fetchJobFileText, downloadJobZip,
 } from "@/lib/api";
 import { BandPlot } from "./BandPlot";
+import { LinePlot } from "./LinePlot";
+
+function PlotTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-mute)" }}>{children}</span>
+      <span
+        style={{
+          fontSize: 9, textTransform: "uppercase", letterSpacing: ".05em",
+          padding: "1px 5px", borderRadius: 4, color: "#fbbf24",
+          background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)",
+        }}
+      >
+        experimental
+      </span>
+    </div>
+  );
+}
 
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -18,6 +37,8 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
   const [detail, setDetail] = useState<JobDetail | null>(null);
   const [files, setFiles] = useState<JobFile[]>([]);
   const [bands, setBands] = useState<BandData | null>(null);
+  const [dos, setDos] = useState<DosData | null>(null);
+  const [phonons, setPhonons] = useState<BandData | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(true);
 
@@ -40,15 +61,19 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
 
     async function tick() {
       try {
-        const [d, f, b] = await Promise.all([
+        const [d, f, b, dd, ph] = await Promise.all([
           fetchJobDetail(jobId).catch(() => null),
           fetchJobFiles(jobId).catch(() => []),
           fetchJobBands(jobId).catch(() => null),
+          fetchJobDos(jobId).catch(() => null),
+          fetchJobPhonons(jobId).catch(() => null),
         ]);
         if (cancelled) return;
         setDetail(d);
         setFiles(f);
         setBands(b);
+        setDos(dd);
+        setPhonons(ph);
         const status = d?.status ?? "";
         // Keep polling while running. Once terminal, poll a couple more times
         // only if nothing has landed yet — artifacts are written just after the
@@ -120,7 +145,7 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
       typeof result.final_energy_ev === "number" ||
       typeof result.band_gap_ev === "number")
   );
-  if (!hasResult && files.length === 0 && !bands) return null;
+  if (!hasResult && files.length === 0 && !bands && !dos && !phonons) return null;
 
   return (
     <div
@@ -206,13 +231,48 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
             </div>
           )}
 
-          {/* band structure plot */}
+          {/* Plots — only present when the experimental toggle is on; the API
+              returns null for all of them otherwise. */}
           {bands && bands.bands.length > 0 && (
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-mute)", marginBottom: 6 }}>
-                Band structure
-              </div>
+              <PlotTitle>Band structure</PlotTitle>
               <BandPlot data={bands} />
+            </div>
+          )}
+
+          {dos?.total && dos.total.points.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <PlotTitle>Total DOS</PlotTitle>
+              <LinePlot
+                series={[{ label: "total", points: dos.total.points }]}
+                xLabel={dos.total.x_label}
+                yLabel="DOS (states/eV)"
+                markerX={dos.total.e_fermi}
+                markerLabel="E_F"
+                windowAroundMarker={dos.total.e_fermi != null ? 12 : undefined}
+              />
+            </div>
+          )}
+
+          {dos?.projected && dos.projected.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <PlotTitle>Projected DOS</PlotTitle>
+              <LinePlot
+                series={dos.projected}
+                xLabel={dos.total?.x_label || "E (eV)"}
+                yLabel="PDOS (states/eV)"
+                markerX={dos.total?.e_fermi ?? null}
+                markerLabel="E_F"
+                windowAroundMarker={dos.total?.e_fermi != null ? 12 : undefined}
+              />
+            </div>
+          )}
+
+          {phonons && phonons.bands.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <PlotTitle>Phonon dispersion</PlotTitle>
+              {/* Same data shape as a band structure, so the band plot renders it. */}
+              <BandPlot data={phonons} />
             </div>
           )}
 
