@@ -437,7 +437,7 @@ export default function Page() {
           // refund or revealed a balance change.
           auth.refresh();
         },
-      }, { model, scriptOnly: effectiveScriptOnly, mode, plots, pseudo });
+      }, { model, scriptOnly: effectiveScriptOnly, mode, plots, pseudo, conversationId: convId });
       jobHandles.current.set(convId, handle);
     },
     [input, activeId, active, backendUrl, auth, streamingConvs, canUseCpu, model, scriptOnly, mode, plots, pseudo],

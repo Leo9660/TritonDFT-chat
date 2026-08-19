@@ -72,6 +72,9 @@ export interface JobOptions {
   plots?: boolean;
   /** Pseudopotential library. Omitted = backend default. */
   pseudo?: PseudoChoice;
+  /** Groups this job with the rest of the chat, so a follow-up question can
+   *  find the earlier runs it is about. */
+  conversationId?: string;
 }
 
 export function runJob(
@@ -211,6 +214,7 @@ export function runJob(
           ...(opts.mode ? { mode: opts.mode } : {}),
           ...(opts.plots != null ? { plots: opts.plots } : {}),
           ...(opts.pseudo ? { pseudo_choice: opts.pseudo } : {}),
+          ...(opts.conversationId ? { conversation_id: opts.conversationId } : {}),
         }),
       });
       if (!resp.ok) {
