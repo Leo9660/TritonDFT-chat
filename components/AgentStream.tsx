@@ -63,6 +63,11 @@ function parse(content: string) {
   // What the run ACTUALLY used. In auto mode the settings panel can only show
   // the fallback, so the panel's triple is not necessarily what ran.
   let pseudoUsed = "";
+  // Anything the agent said that none of the shapes below claimed. Normally
+  // hidden — it is the debugging chatter this parser exists to suppress — but a
+  // run that produced no plan and no steps has nothing else to show, and
+  // rendering a blank card in that case told the user nothing at all.
+  const stray: string[] = [];
   const steps: StepCard[] = [];
   let cur: StepCard | null = null;
   // The backend appends a "> ⏹ Stopped." / "> ⚠️ …" trailer on a terminal run.
@@ -112,6 +117,12 @@ function parse(content: string) {
       continue;
     }
 
+    if (!cur) {
+      // Not inside a step yet: keep it, in case the run never gets that far.
+      if (!/^(\[|Run cutoffs pinned)/.test(line)) stray.push(body);
+      else stray.push(line);
+    }
+
     if (cur) {
       if (VALIDATION_RE.test(body)) {
         if (/^\[validation\]/i.test(body)) cur.fixups += 1;
@@ -137,7 +148,7 @@ function parse(content: string) {
     if (row) st.exec = row.binary;
   });
 
-  return { material, plan, steps, notice, pseudoUsed };
+  return { material, plan, steps, notice, pseudoUsed, stray };
 }
 
 /** "pw.x (vc-relax)" -> "vc-relax"; "bands.x" -> "bands.x".
@@ -286,9 +297,16 @@ function StepBody({
   const [tab, setTab] = useState<"log" | "input">("log");
   const [input, setInput] = useState<string | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "missing">("idle");
+  // Guarding with a ref, not with `state`. `state` was both a dependency and
+  // set inside the effect, so setState("loading") re-ran it, the cleanup of the
+  // first run flipped its `alive` flag, and the reply that came back was thrown
+  // away — while the re-run bailed out on `state !== "idle"`. The request
+  // succeeded every time and the tab said "Loading…" forever.
+  const requested = useRef(false);
 
   useEffect(() => {
-    if (tab !== "input" || input != null || state !== "idle" || !findInput) return;
+    if (tab !== "input" || !findInput || requested.current) return;
+    requested.current = true;
     let alive = true;
     setState("loading");
     findInput(index).then(
@@ -297,10 +315,10 @@ function StepBody({
         if (text == null) setState("missing");
         else { setInput(text); setState("idle"); }
       },
-      () => alive && setState("missing"),
+      () => { if (alive) setState("missing"); },
     );
     return () => { alive = false; };
-  }, [tab, input, state, findInput, index]);
+  }, [tab, findInput, index]);
 
   const pre = {
     ...mono, lineHeight: 1.5, color: "var(--fg-mute)", whiteSpace: "pre-wrap" as const,
@@ -336,7 +354,7 @@ function StepBody({
           {t("inputNotWritten")}{" "}
           <button
             type="button"
-            onClick={() => setState("idle")}
+            onClick={() => { requested.current = false; setState("idle"); }}
             style={{ ...mono, color: "var(--blue-500)", cursor: "pointer",
                      background: "none", border: "none", padding: 0 }}
           >
@@ -354,7 +372,7 @@ function StepBody({
 
 export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Props) {
   const { t } = useTranslation();
-  const { material, plan, steps, notice, pseudoUsed } = useMemo(() => parse(content), [content]);
+  const { material, plan, steps, notice, pseudoUsed, stray } = useMemo(() => parse(content), [content]);
 
   // One request per step, resolved server-side by the step's own filename.
   // Listing the whole run directory and filtering here meant an iterdir+stat
@@ -531,6 +549,21 @@ export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Prop
             {material.length > 0 ? t("phasePlanning") : t("phaseLookup")}
           </span>
         </div>
+      )}
+
+      {/* Last resort: the run is over, produced no plan and no steps, and had
+        * no notice either. Rather than an empty card, show what it did say. */}
+      {!isStreaming && !notice && plan.length === 0 && steps.length === 0 && stray.length > 0 && (
+        <pre
+          className="overflow-x-auto"
+          style={{
+            ...mono, lineHeight: 1.5, color: "var(--fg-mute)", whiteSpace: "pre-wrap",
+            background: "var(--bg-0)", border: "1px solid var(--border)",
+            borderRadius: 8, padding: "8px 10px", maxHeight: 320, overflowY: "auto",
+          }}
+        >
+          {stray.slice(-40).join("\n")}
+        </pre>
       )}
 
       {/* Why the run ended, when it ended before producing anything. */}
