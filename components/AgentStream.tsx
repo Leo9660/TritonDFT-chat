@@ -186,6 +186,10 @@ const ASIDES = [
   "Consulting Kohn and Sham…",
   "Negotiating with the exchange-correlation functional…",
   "Asking Bloch to confirm the periodicity…",
+  "Checking that Hohenberg and Kohn still stand by their theorem…",
+  "Filling the Brillouin zone, one k-point at a time…",
+  "Asking the pseudopotential what it hid in the core…",
+  "Making sure nobody moved the Fermi level…",
 ];
 
 /** The line under a running step, cycling between what the step is actually
