@@ -369,11 +369,14 @@ export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Prop
         <Card
           icon={<ListChecksIcon size={13} style={{ color: "var(--blue-500)" }} />}
           title={t("planTitle")}
-          right={
+          right={<span style={{ ...mono, color: "var(--fg-dim)" }}>{plan.length} {t("stepsWord")}</span>}
+          subtitle={
+            /* Its own row. Sharing the header line with the title and the step
+               count left the chain fighting for width and colliding with them. */
             <span
               style={{
-                ...mono, color: "var(--fg-mute)", whiteSpace: "nowrap",
-                overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%",
+                ...mono, display: "block", marginTop: 3, color: "var(--fg-mute)",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
               }}
             >
               {plan.map((p, i) => (
