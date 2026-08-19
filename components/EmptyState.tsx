@@ -15,78 +15,70 @@ interface Starter {
 
 // 12 starter prompts spanning semiconductors / metals / 2D / ionic / magnetic / heavy.
 // Each visit shows 4 randomly.
+/* Starters are the first thing a new user clicks, so every one of them has to
+ * finish quickly and succeed. That rules out most of what was here before:
+ * a monolayer needs ~15 A of vacuum and the FFT grid that implies costs more
+ * than a bulk cell four times its size; Born effective charges and phonon DOS
+ * are DFPT sweeps; a bulk modulus is several runs plus an equation-of-state
+ * fit; +U and spin-orbit each add their own way to fail.
+ *
+ * What is left is 1-4 atom bulk cells at high symmetry. Measured on real
+ * hardware at 8 ranks, an scf of diamond Si is 0.9s and a full vc-relax 1.8s —
+ * for these systems the agent's own reasoning dominates the wall clock, which
+ * is the right place for a demo to spend its time.
+ *
+ * The prompts also no longer dictate cutoffs and k-meshes. Choosing those is
+ * the agent's job and depends on the pseudopotential library in force, so a
+ * hardcoded "ecutwfc 30 Ry" was both redundant and occasionally wrong.
+ */
 const ALL_STARTERS: Starter[] = [
   {
     label: "Silicon",
-    sub: "vc-relax · LDA",
+    sub: "band structure",
     prompt:
-      "Si diamond cubic, vc-relax with LDA, ecutwfc 30 Ry, k-grid 8×8×8. Report lattice constant and bulk modulus.",
+      "Calculate the band structure of bulk silicon and report the band gap.",
   },
   {
-    label: "Graphene",
-    sub: "scf · PBE · 2D",
+    label: "Silicon",
+    sub: "lattice constant",
     prompt:
-      "Graphene 2D, scf with PBE, ecutwfc 60 Ry, k-grid 16×16×1, vacuum 15 Å. Report Dirac point and Fermi velocity.",
+      "Relax bulk silicon and report the equilibrium lattice constant.",
   },
   {
-    label: "Iron",
-    sub: "magnetic · PBE+U",
+    label: "Sodium",
+    sub: "bcc metal",
     prompt:
-      "Fe bcc, magnetic scf with PBE+U (U=4.5 eV on 3d), ecutwfc 50 Ry. Report magnetic moment and lattice constant.",
+      "Relax bulk sodium and report the equilibrium lattice constant.",
   },
   {
-    label: "TiO₂",
-    sub: "rutile · band structure",
+    label: "Aluminium",
+    sub: "fcc metal",
     prompt:
-      "TiO2 rutile, band structure with PBE, ecutwfc 50 Ry. Compute band gap along Γ-X-M-R-Γ.",
+      "Relax bulk aluminium and report the equilibrium lattice constant.",
+  },
+  {
+    label: "MgO",
+    sub: "density of states",
+    prompt:
+      "Compute the total density of states of bulk MgO and report the band gap.",
   },
   {
     label: "Diamond",
-    sub: "C · bulk modulus",
+    sub: "wide gap",
     prompt:
-      "Diamond cubic carbon, vc-relax with PBE, ecutwfc 80 Ry, k-grid 8×8×8. Report lattice constant and bulk modulus.",
+      "Calculate the band structure of diamond and report the band gap.",
+  },
+  {
+    label: "Silicon",
+    sub: "phonons at gamma",
+    prompt:
+      "Compute the phonon frequencies of bulk silicon at the gamma point.",
   },
   {
     label: "Copper",
-    sub: "fcc metal · workfunction",
+    sub: "fcc metal",
     prompt:
-      "Cu fcc, scf with PBE, ecutwfc 40 Ry, k-grid 12×12×12. Report cohesive energy and equilibrium lattice constant.",
-  },
-  {
-    label: "NaCl",
-    sub: "rock salt · ionic",
-    prompt:
-      "NaCl rock-salt, vc-relax with PBE, ecutwfc 50 Ry, k-grid 6×6×6. Report lattice constant and Born effective charges.",
-  },
-  {
-    label: "GaAs",
-    sub: "zinc-blende · direct gap",
-    prompt:
-      "GaAs zinc-blende, scf with PBE, ecutwfc 50 Ry, k-grid 8×8×8. Then nscf for band structure along Γ-X-L-Γ.",
-  },
-  {
-    label: "MoS₂",
-    sub: "2D TMD · monolayer",
-    prompt:
-      "MoS2 monolayer 2H, scf with PBE, ecutwfc 60 Ry, k-grid 12×12×1, vacuum 15 Å. Report band gap (direct vs indirect).",
-  },
-  {
-    label: "Aluminum",
-    sub: "fcc · phonons",
-    prompt:
-      "Al fcc, scf with PBE, ecutwfc 40 Ry, k-grid 10×10×10. Then phonon DOS via DFPT on a 4×4×4 q-grid.",
-  },
-  {
-    label: "hBN",
-    sub: "2D · wide gap",
-    prompt:
-      "Hexagonal BN monolayer, scf with PBE, ecutwfc 60 Ry, k-grid 12×12×1, vacuum 15 Å. Report band gap.",
-  },
-  {
-    label: "Germanium",
-    sub: "diamond · spin-orbit",
-    prompt:
-      "Ge diamond cubic, scf with PBE + spin-orbit, ecutwfc 40 Ry, k-grid 8×8×8. Report band gap (direct vs indirect).",
+      "Relax bulk copper and report the equilibrium lattice constant.",
   },
 ];
 
