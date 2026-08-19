@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import { useTranslation } from "react-i18next";
+import { Activity as ActivityIcon } from "lucide-react";
 import "@/lib/i18n";
 
 import { Sidebar } from "@/components/Sidebar";
@@ -12,6 +13,7 @@ import { ChatMessages } from "@/components/ChatMessages";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { AgentActivityPanel } from "@/components/AgentActivityPanel";
+import { ImportantSettings } from "@/components/ImportantSettings";
 import { PromptLibrary } from "@/components/PromptLibrary";
 import { ScriptApprovalModal } from "@/components/ScriptApprovalModal";
 import { PlanReviewModal } from "@/components/PlanReviewModal";
@@ -43,7 +45,7 @@ const ACTIVITY_MAX = 640;
 const ACTIVITY_DEFAULT = 320;
 
 export default function Page() {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const auth = useAuth();
   const [hydrated, setHydrated] = useState(false);
   // True once conversations are loaded under the correct per-account scope —
@@ -636,9 +638,6 @@ export default function Page() {
           hasConversation={!!active && active.messages.length > 0}
           panelOpen={panelOpen}
           onTogglePanel={() => setPanelOpen((x) => !x)}
-          pseudo={pseudo}
-          onPseudoChange={onPseudoChange}
-          settingsDisabled={activeStreaming}
           onExport={() => { if (active) downloadMarkdown(active); }}
           onCopy={async () => { if (active) await copyMarkdown(active); }}
         />
@@ -671,24 +670,46 @@ export default function Page() {
           </div>
         </div>
       </main>
-      {panelOpen && (
-        <>
-          {/* Drag handle */}
-          <div
-            onMouseDown={startResize}
-            className="hidden lg:block resize-handle"
-            title="Drag to resize"
-            aria-label="Resize activity panel"
+      {/* Right column: settings that change the science are pinned at the top and
+          never collapse; the activity log below them is a transcript, so it is the
+          part that closes. With it closed the settings keep the full column. */}
+      <>
+        <div
+          onMouseDown={startResize}
+          className="hidden lg:block resize-handle"
+          title="Drag to resize"
+          aria-label="Resize right panel"
+        />
+        <div
+          style={{ width: activityWidth }}
+          className="hidden lg:flex shrink-0 flex-col"
+        >
+          <ImportantSettings
+            pseudo={pseudo}
+            onPseudoChange={onPseudoChange}
+            disabled={activeStreaming}
           />
-          <div style={{ width: activityWidth }} className="hidden lg:flex shrink-0">
-            <AgentActivityPanel
-              conversation={active}
-              isStreaming={activeStreaming}
-              onClose={() => setPanelOpen(false)}
-            />
-          </div>
-        </>
-      )}
+          {panelOpen ? (
+            <div className="flex-1 min-h-0 flex">
+              <AgentActivityPanel
+                conversation={active}
+                isStreaming={activeStreaming}
+                onClose={() => setPanelOpen(false)}
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setPanelOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-left transition"
+              style={{ color: "var(--fg-dim)", fontSize: 11 }}
+              title={t("showPanel") as string}
+            >
+              <ActivityIcon size={13} />
+              {t("activity")}
+            </button>
+          )}
+        </div>
+      </>
       <SettingsDialog
         open={settingsOpen}
         backendUrl={backendUrl}
