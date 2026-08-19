@@ -3,7 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { SlidersHorizontal } from "lucide-react";
 import {
-  Accuracy, PseudoChoice, Relativistic, Xc,
+  Accuracy, PseudoChoice, PseudoMode, Relativistic, Xc,
   DEFAULT_PSEUDO, pseudoAvailable,
 } from "@/lib/types";
 
@@ -114,6 +114,37 @@ export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
           <span>{t("pseudoAxisRel")}</span>
           <span>{t("pseudoAxisAcc")}</span>
         </div>
+
+        {/* Who wins when the prompt also names a library. Without this the
+            dropdown always won and "use PBEsol" in a query did nothing — but
+            handing the choice to the agent unconditionally is wrong for someone
+            who does not know what the choice means. */}
+        <div className="flex items-center gap-1 mt-2.5">
+          {(["manual", "auto"] as PseudoMode[]).map((m) => {
+            const on = (pseudo.mode ?? "manual") === m;
+            return (
+              <button
+                key={m}
+                type="button"
+                disabled={disabled}
+                onClick={() => pick({ mode: m })}
+                className="flex-1 px-2 py-1 rounded-md text-[10px] transition"
+                style={{
+                  border: `1px solid ${on ? "var(--border-strong)" : "var(--border)"}`,
+                  background: on ? "var(--bg-2)" : "transparent",
+                  color: on ? "var(--fg)" : "var(--fg-dim)",
+                  fontWeight: on ? 600 : 400,
+                  cursor: disabled ? "default" : "pointer",
+                }}
+              >
+                {t(m === "manual" ? "pseudoModeManual" : "pseudoModeAuto")}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] leading-snug mt-1" style={{ color: "var(--fg-dim)" }}>
+          {t((pseudo.mode ?? "manual") === "manual" ? "pseudoModeManualDesc" : "pseudoModeAutoDesc")}
+        </p>
 
         <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid var(--border)" }}>
           <div className="text-[10px]" style={{ color: "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>

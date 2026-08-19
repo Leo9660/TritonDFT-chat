@@ -55,10 +55,23 @@ export type Xc = "LDA" | "PBE" | "PBEsol";
 export type Relativistic = "SR" | "FR";
 export type Accuracy = "standard" | "stringent";
 
+/** Who decides the pseudopotential library.
+ *
+ *  "manual" — the dropdowns are binding and a library named in the prompt is
+ *             ignored. Right for someone who does not know what the choice
+ *             means: what they picked is what runs.
+ *  "auto"   — the agent chooses, and a library named in the prompt wins. Right
+ *             for someone who does know, and the only way "use PBEsol" in a
+ *             query takes effect. The dropdowns become the fallback for when
+ *             the prompt says nothing.
+ */
+export type PseudoMode = "manual" | "auto";
+
 export interface PseudoChoice {
   xc: Xc;
   relativistic: Relativistic;
   accuracy: Accuracy;
+  mode: PseudoMode;
 }
 
 /** PseudoDojo publishes no fully-relativistic LDA library. */
@@ -70,6 +83,9 @@ export const DEFAULT_PSEUDO: PseudoChoice = {
   xc: "PBE",
   relativistic: "SR",
   accuracy: "standard",
+  // Manual by default: the website's audience is people meeting DFT for the
+  // first time, and a control that silently does nothing is worse than none.
+  mode: "manual",
 };
 
 export interface Conversation {
