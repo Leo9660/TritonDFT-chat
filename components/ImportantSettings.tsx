@@ -31,6 +31,8 @@ const ACC: Accuracy[] = ["standard", "stringent"];
 export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // Names the axis that was auto-moved, so a silent correction is visible.
+  const [autoMoved, setAutoMoved] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,11 +51,23 @@ export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
 
   function pick(next: Partial<PseudoChoice>) {
     const merged = { ...pseudo, ...next };
-    // Correct the other axis rather than leaving an unrunnable selection.
-    if (!pseudoAvailable(merged.xc, merged.relativistic)) {
-      merged.relativistic = next.relativistic ? "SR" : merged.relativistic;
-      if (!pseudoAvailable(merged.xc, merged.relativistic)) merged.xc = "PBE";
+    if (pseudoAvailable(merged.xc, merged.relativistic)) {
+      setAutoMoved(null);
+      onPseudoChange(merged);
+      return;
     }
+    // Every option stays selectable. When a pick lands on a combination that
+    // does not exist, the axis the user just touched WINS and the other one
+    // moves to its first legal value. Rolling back the click instead would mean
+    // "to choose LDA, first switch FR to SR" — the user would have to know the
+    // constraint before they could satisfy it.
+    if (next.xc !== undefined) {
+      merged.relativistic =
+        REL.find((r) => pseudoAvailable(merged.xc, r)) ?? merged.relativistic;
+    } else if (next.relativistic !== undefined) {
+      merged.xc = XC.find((x) => pseudoAvailable(x, merged.relativistic)) ?? merged.xc;
+    }
+    setAutoMoved(next.xc !== undefined ? merged.relativistic : merged.xc);
     onPseudoChange(merged);
   }
 
@@ -127,7 +141,7 @@ export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
                     onChange={(e) => pick({ relativistic: e.target.value as Relativistic })}
                     title={t("pseudoRel") as string}>
               {REL.map((r) => (
-                <option key={r} value={r} disabled={!pseudoAvailable(pseudo.xc, r)}>{r}</option>
+                <option key={r} value={r}>{r}</option>
               ))}
             </select>
             <select style={sel} disabled={disabled} value={pseudo.accuracy}
@@ -148,6 +162,11 @@ export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
               {pseudo.xc} · {pseudo.relativistic} · {pseudo.accuracy}
               {isDefault ? ` (${t("pseudoDefault")})` : ""}
             </div>
+            {autoMoved && (
+              <div className="text-[10px] mt-1" style={{ color: "#fbbf24" }}>
+                {t("pseudoAutoMoved", { value: autoMoved })}
+              </div>
+            )}
             <div className="text-[10px] mt-1" style={{ color: "var(--fg-dim)" }}>
               {pseudo.relativistic === "FR" ? t("pseudoNoteFr") : t("pseudoNoteSr")}
               {" "}
