@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchJobFiles, fetchJobFileText } from "@/lib/api";
+import { fetchStepInput } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import {
   ChevronRightIcon, AlertTriangleIcon, CheckIcon,
@@ -322,9 +322,21 @@ function StepBody({
       </div>
       {tab === "log" ? (
         <pre className="overflow-x-auto" style={pre}>{log.join("\n") || t("noOutputYet")}</pre>
+      ) : state === "missing" ? (
+        <div style={{ ...mono, color: "var(--fg-dim)", padding: "8px 10px" }}>
+          {t("inputNotWritten")}{" "}
+          <button
+            type="button"
+            onClick={() => setState("idle")}
+            style={{ ...mono, color: "var(--blue-500)", cursor: "pointer",
+                     background: "none", border: "none", padding: 0 }}
+          >
+            {t("retry")}
+          </button>
+        </div>
       ) : (
         <pre className="overflow-x-auto" style={pre}>
-          {input ?? (state === "missing" ? t("inputNotWritten") : t("loadingInput"))}
+          {input ?? t("loadingInput")}
         </pre>
       )}
     </>
@@ -335,32 +347,20 @@ export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Prop
   const { t } = useTranslation();
   const { material, plan, steps, notice } = useMemo(() => parse(content), [content]);
 
-  // One directory listing per run, shared by every step, plus a per-file text
-  // cache so re-opening a tab is instant. During a live run files appear as
-  // steps finish, so a listing that does not contain the wanted file is
-  // refreshed once rather than trusted.
-  const listing = useRef<Promise<{ name: string }[]> | null>(null);
+  // One request per step, resolved server-side by the step's own filename.
+  // Listing the whole run directory and filtering here meant an iterdir+stat
+  // over a PVC eight workers are writing to — slow enough to look like a hang.
   const texts = useRef<Map<string, string>>(new Map());
 
   const findInput = useCallback(
     async (index: string): Promise<string | null> => {
       if (!jobId) return null;
-      const prefix = index.split("/")[0].padStart(2, "0") + "_";
-      const pick = (fs: { name: string }[]) =>
-        fs.find((f) => f.name.startsWith(prefix) && f.name.endsWith(".in"))?.name;
-
-      if (!listing.current) listing.current = fetchJobFiles(jobId);
-      let name = pick(await listing.current);
-      if (!name) {
-        listing.current = fetchJobFiles(jobId);
-        name = pick(await listing.current);
-      }
-      if (!name) return null;
-
-      const hit = texts.current.get(name);
+      const step = parseInt(index.split("/")[0], 10);
+      const key = `${jobId}:${step}`;
+      const hit = texts.current.get(key);
       if (hit != null) return hit;
-      const text = await fetchJobFileText(jobId, name);
-      texts.current.set(name, text);
+      const text = await fetchStepInput(jobId, step);
+      if (text != null) texts.current.set(key, text);
       return text;
     },
     [jobId],

@@ -347,6 +347,23 @@ export async function fetchJobPhonons(jobId: string): Promise<BandData | null> {
   return (await r.json()).phonons ?? null;
 }
 
+/** The generated input for one step. Times out rather than hanging: the run
+ *  directory lives on a busy PVC and a slow listing used to leave the tab
+ *  saying "Loading…" indefinitely with no way back. */
+export async function fetchStepInput(
+  jobId: string, step: number, timeoutMs = 12000,
+): Promise<string | null> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await authFetch(`/jobs/${jobId}/steps/${step}/input`, { signal: ctl.signal });
+    if (!r.ok) return null;
+    return (await r.json()).text ?? null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchJobFileText(jobId: string, name: string): Promise<string> {
   const r = await authFetch(`/jobs/${jobId}/files/${encodeURIComponent(name)}`);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
