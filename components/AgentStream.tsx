@@ -55,6 +55,10 @@ function parse(content: string) {
   const plan: PlanRow[] = [];
   const steps: StepCard[] = [];
   let cur: StepCard | null = null;
+  // The backend appends a "> ⏹ Stopped." / "> ⚠️ …" trailer on a terminal run.
+  // Without capturing it, a run stopped before the plan arrived parsed to
+  // nothing at all and had no way to say why it was empty.
+  let notice = "";
 
   for (const raw of content.split("\n")) {
     const line = raw.trim();
@@ -65,6 +69,9 @@ function parse(content: string) {
     const body = m ? m[2] : line;
 
     if (DROP_RE.test(body) || DROP_RE.test(line)) continue;
+
+    const n = line.match(/^>\s*([⏹⚠️].*)$/);
+    if (n) { notice = n[1].trim(); continue; }
 
     if (tag === "mp") { material.push(body); continue; }
 
@@ -95,7 +102,7 @@ function parse(content: string) {
     if (row) st.exec = row.binary;
   });
 
-  return { material, plan, steps };
+  return { material, plan, steps, notice };
 }
 
 function Card({
@@ -179,9 +186,9 @@ function BusyLine({ exec }: { exec?: string }) {
 
   const [i, setI] = useState(0);
   useEffect(() => {
-    // Long enough to read the sentence, short enough that a multi-minute SCF
-    // still visibly changes.
-    const id = setInterval(() => setI((n) => n + 1), 6000);
+    // Long enough to read the sentence twice without it feeling restless;
+    // short enough that a multi-minute SCF still visibly changes.
+    const id = setInterval(() => setI((n) => n + 1), 10000);
     return () => clearInterval(id);
   }, []);
 
@@ -198,7 +205,7 @@ function BusyLine({ exec }: { exec?: string }) {
 
 export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
   const { t } = useTranslation();
-  const { material, plan, steps } = useMemo(() => parse(content), [content]);
+  const { material, plan, steps, notice } = useMemo(() => parse(content), [content]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -286,11 +293,14 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
         );
       })}
 
-      {steps.length === 0 && plan.length === 0 && (
-        /* Before the material lookup resolves there is nothing structured to
-         * show, and dumping the raw log here was worse than showing nothing —
-         * it is the API snippet and the query echo, which say nothing useful.
-         * Name the phase instead. */
+      {/* Before the material lookup resolves there is nothing structured to
+        * show, and dumping the raw log here was worse than showing nothing — it
+        * is the API snippet and the query echo. Name the phase instead.
+        *
+        * Gated on isStreaming: a run stopped this early parses to nothing, and
+        * an ungated spinner kept turning forever on a job that had already
+        * ended. */}
+      {steps.length === 0 && plan.length === 0 && isStreaming && (
         <div
           className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
           style={{ border: "1px solid var(--border)", background: "var(--bg-1)" }}
@@ -299,6 +309,16 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
           <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>
             {material.length > 0 ? t("phasePlanning") : t("phaseLookup")}
           </span>
+        </div>
+      )}
+
+      {/* Why the run ended, when it ended before producing anything. */}
+      {!isStreaming && notice && (
+        <div
+          className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+          style={{ border: "1px solid var(--border)", background: "var(--bg-1)" }}
+        >
+          <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>{notice}</span>
         </div>
       )}
     </div>
