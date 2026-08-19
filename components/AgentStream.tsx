@@ -84,7 +84,15 @@ function parse(content: string) {
 
     if (tag === "plan") {
       const p = body.match(PLAN_RE);
-      if (p) plan.push({ index: p[1], binary: p[3], problem: p[4].replace(/\s*\[unknown tool\]$/, "") });
+      if (p) {
+        // A revised plan is emitted as a fresh block into the same stream, so
+        // appending gave the union of every revision — the assistant-mode edit
+        // showed 10 steps for a 5-step plan. Each block starts at 1/N, so that
+        // is the boundary: seeing step 1 again means a new plan replaces the
+        // one before it.
+        if (p[1].startsWith("1/") && plan.length > 0) plan.length = 0;
+        plan.push({ index: p[1], binary: p[3], problem: p[4].replace(/\s*\[unknown tool\]$/, "") });
+      }
       continue;
     }
 
