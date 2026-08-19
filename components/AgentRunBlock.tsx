@@ -9,6 +9,7 @@ import { PseudoChoice } from "@/lib/types";
 interface Props {
   content: string;
   isStreaming: boolean;
+  jobId?: string;
   onRetry?: () => void;
   pseudo?: PseudoChoice;
   model?: string;
@@ -27,7 +28,7 @@ interface Props {
  * State pill becomes red ("Failed at step N") when the body contains an
  * [ERROR]-class tag. Footer shows a Retry button on failure.
  */
-export function AgentRunBlock({ content, isStreaming, onRetry, pseudo, model }: Props) {
+export function AgentRunBlock({ content, isStreaming, onRetry, pseudo, model, jobId }: Props) {
   const { t } = useTranslation();
   const { stepCount, errorAt } = useMemo(() => parseAgentState(content), [content]);
 
@@ -85,7 +86,7 @@ export function AgentRunBlock({ content, isStreaming, onRetry, pseudo, model }: 
           </div>
         ) : (
           <>
-            <AgentStream content={content} isStreaming={isStreaming} pseudo={pseudo} model={model} />
+            <AgentStream content={content} isStreaming={isStreaming} pseudo={pseudo} model={model} jobId={jobId} />
           </>
         )}
       </div>

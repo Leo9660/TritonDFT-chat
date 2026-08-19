@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { fetchJobFiles, fetchJobFileText } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import {
   ChevronRightIcon, AlertTriangleIcon, CheckIcon,
@@ -25,6 +26,7 @@ interface Props {
   isStreaming?: boolean;
   pseudo?: PseudoChoice;
   model?: string;
+  jobId?: string;
 }
 
 interface StepCard {
@@ -130,6 +132,10 @@ function Card({
   collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  // A non-collapsible card has no way to open itself — its header click is a
+  // no-op — so gating children on `open` meant they never rendered at all.
+  // That silently hid the entire plan list.
+  const showChildren = collapsible ? open : true;
   const border =
     tone === "error" ? "rgba(220, 80, 70, 0.35)"
     : tone === "accent" ? "var(--border-strong)"
@@ -154,7 +160,7 @@ function Card({
         </span>
         <span className="shrink-0" style={{ marginTop: 1 }}>{right}</span>
       </button>
-      {open && children && <div className="px-3 pb-3">{children}</div>}
+      {showChildren && children && <div className="px-3 pb-3">{children}</div>}
     </div>
   );
 }
@@ -233,7 +239,79 @@ function BusyLine({ exec }: { exec?: string }) {
   );
 }
 
-export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
+
+/** A step's expandable body: the input Quantum ESPRESSO wrote, and the log it
+ *  produced. The input is the artifact a user actually checks to decide whether
+ *  to trust a number, so it belongs here next to the output rather than only in
+ *  the downloadable bundle.
+ *
+ *  Fetched lazily on first view of the tab: during a live run the files land on
+ *  disk step by step, and requesting them for every step up front would be a
+ *  burst of requests for panels nobody opened.
+ */
+function StepBody({ jobId, index, log }: { jobId?: string; index: string; log: string[] }) {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<"log" | "input">("log");
+  const [input, setInput] = useState<string | null>(null);
+  const [state, setState] = useState<"idle" | "loading" | "missing">("idle");
+
+  useEffect(() => {
+    if (tab !== "input" || input != null || state !== "idle" || !jobId) return;
+    setState("loading");
+    (async () => {
+      // Files are named <zero-padded step>_<task>.in — 03_nscf.in for step 3.
+      const n = index.split("/")[0].padStart(2, "0");
+      try {
+        const files = await fetchJobFiles(jobId);
+        const f = files.find((x) => x.name.startsWith(n + "_") && x.name.endsWith(".in"));
+        if (!f) { setState("missing"); return; }
+        setInput(await fetchJobFileText(jobId, f.name));
+        setState("idle");
+      } catch {
+        setState("missing");
+      }
+    })();
+  }, [tab, input, state, jobId, index]);
+
+  const pre = {
+    ...mono, lineHeight: 1.5, color: "var(--fg-mute)", whiteSpace: "pre-wrap" as const,
+    background: "var(--bg-0)", border: "1px solid var(--border)",
+    borderRadius: 8, padding: "8px 10px", maxHeight: 320, overflowY: "auto" as const,
+  };
+
+  const Tab = ({ id, label }: { id: "log" | "input"; label: string }) => (
+    <button
+      type="button"
+      onClick={() => setTab(id)}
+      style={{
+        ...mono, padding: "2px 8px", borderRadius: 6, cursor: "pointer",
+        border: "1px solid " + (tab === id ? "var(--border-strong)" : "transparent"),
+        background: tab === id ? "var(--bg-2)" : "transparent",
+        color: tab === id ? "var(--fg)" : "var(--fg-dim)",
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <>
+      <div className="flex items-center gap-1 mt-1 mb-1.5">
+        <Tab id="log" label={t("tabOutput")} />
+        {jobId && <Tab id="input" label={t("tabInput")} />}
+      </div>
+      {tab === "log" ? (
+        <pre className="overflow-x-auto" style={pre}>{log.join("\n") || t("noOutputYet")}</pre>
+      ) : (
+        <pre className="overflow-x-auto" style={pre}>
+          {input ?? (state === "missing" ? t("inputNotWritten") : t("loadingInput"))}
+        </pre>
+      )}
+    </>
+  );
+}
+
+export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Props) {
   const { t } = useTranslation();
   const { material, plan, steps, notice } = useMemo(() => parse(content), [content]);
 
@@ -328,16 +406,7 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
               </span>
             }
           >
-            <pre
-              className="mt-1 overflow-x-auto"
-              style={{
-                ...mono, lineHeight: 1.5, color: "var(--fg-mute)", whiteSpace: "pre-wrap",
-                background: "var(--bg-0)", border: "1px solid var(--border)",
-                borderRadius: 8, padding: "8px 10px", maxHeight: 320, overflowY: "auto",
-              }}
-            >
-              {st.log.join("\n") || t("noOutputYet")}
-            </pre>
+            <StepBody jobId={jobId} index={st.index} log={st.log} />
           </Card>
         );
       })}
