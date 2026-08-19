@@ -410,20 +410,30 @@ export default function AdminPage() {
                         icon={u.is_banned ? <CheckCircle2Icon size={13} /> : <BanIcon size={13} />}
                         color={u.is_banned ? "#22c55e" : "#ef4444"}
                       />
+                      {/* CPU access is implied by admin and by unlimited, so for
+                          those users the flag says nothing about what they can
+                          actually do — show it as already in effect rather than
+                          as "not granted", which read as a lie. */}
                       <ActionBtn
-                        title={u.can_use_cpu ? "Revoke CPU access" : "Grant CPU access (credits still charged)"}
+                        title={
+                          u.is_admin || u.is_unlimited ? "CPU access (already implied)"
+                          : u.can_use_cpu ? "Revoke CPU" : "Grant CPU"
+                        }
                         onClick={() => patchUser(u.email, { can_use_cpu: !u.can_use_cpu })}
                         icon={<CpuIcon size={13} />}
-                        color={u.can_use_cpu ? "var(--fg-dim)" : "#22c55e"}
+                        color={
+                          u.is_admin || u.is_unlimited || u.can_use_cpu
+                            ? "var(--fg-dim)" : "#22c55e"
+                        }
                       />
                       <ActionBtn
-                        title={u.is_unlimited ? "Remove whitelist (unlimited credits)" : "Add to whitelist (unlimited credits + CPU)"}
+                        title={u.is_unlimited ? "Remove from whitelist" : "Whitelist"}
                         onClick={() => patchUser(u.email, { is_unlimited: !u.is_unlimited })}
                         icon={<InfinityIcon size={13} />}
                         color={u.is_unlimited ? "var(--fg-dim)" : "var(--amber-500, #f59e0b)"}
                       />
                       <ActionBtn
-                        title={u.is_admin ? "Demote from admin" : "Promote to admin"}
+                        title={u.is_admin ? "Demote" : "Promote to admin"}
                         onClick={() => {
                           if (!confirm(`${u.is_admin ? "Demote" : "Promote"} ${u.email}?`)) return;
                           patchUser(u.email, { is_admin: !u.is_admin });
