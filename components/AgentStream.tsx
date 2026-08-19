@@ -290,14 +290,20 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
       {/* 4. One card per step; the log lives inside it. */}
       {steps.map((st, i) => {
         const isLast = i === steps.length - 1;
-        const running = !!isStreaming && isLast && !st.failed;
+        const running = !!isStreaming && isLast;
+        // A step that hit an error but is STILL RUNNING must not read as
+        // failed. The agent recovers from most of them — a rejected input is
+        // regenerated, a bad parameter is retried — and showing a red card the
+        // moment the word ERROR appears makes a healthy run look broken to
+        // anyone watching. Only a step that has stopped AND errored shows it.
+        const failed = st.failed && !running;
         return (
           <Card
             key={st.index + i}
-            tone={st.failed ? "error" : "plain"}
+            tone={failed ? "error" : "plain"}
             icon={
-              st.failed ? <AlertTriangleIcon size={13} style={{ color: "#c0453c" }} />
-              : running ? <span style={{ color: "var(--green-500)" }}><AtomSpinner size={14} /></span>
+              running ? <span style={{ color: "var(--green-500)" }}><AtomSpinner size={14} /></span>
+              : failed ? <AlertTriangleIcon size={13} style={{ color: "#c0453c" }} />
               : <CheckIcon size={13} style={{ color: "var(--blue-500)" }} />
             }
             title={

@@ -460,8 +460,11 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
         ) : (
           <ol className="activity-phases">
             {phases.map((p) => {
-              const isLastInLatest = isStreaming && p.phaseIndex === lastPhaseIndex && !p.hasError;
-              const stateClass = p.hasError ? "is-error" : isLastInLatest ? "is-active" : "is-done";
+              // Deliberately NOT gated on hasError: a phase that is still the
+              // live one keeps reading as active even after an error line, so a
+              // recoverable failure mid-run does not present as a dead run.
+              const isLastInLatest = isStreaming && p.phaseIndex === lastPhaseIndex;
+              const stateClass = isLastInLatest ? "is-active" : p.hasError ? "is-error" : "is-done";
               const isOpen = expanded.has(p.phaseIndex) || p.hasError;
               const PhaseIcon = phaseIcon(p);
               const startedAt = p.steps[0]?.firstSeenAt ?? 0;
@@ -490,10 +493,10 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
                         className={`activity-phase-chev ${isOpen ? "is-open" : ""}`}
                       />
                       <span className="activity-phase-status-icon">
-                        {p.hasError ? (
-                          <AlertTriangleIcon size={13} style={{ color: "#ef4444" }} />
-                        ) : isLastInLatest ? (
+                        {isLastInLatest ? (
                           <span style={{ color: "var(--green-500)" }}><AtomSpinner size={14} /></span>
+                        ) : p.hasError ? (
+                          <AlertTriangleIcon size={13} style={{ color: "#ef4444" }} />
                         ) : (
                           <CheckIcon size={13} style={{ color: "#4577ff" }} />
                         )}
