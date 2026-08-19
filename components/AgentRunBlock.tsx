@@ -86,7 +86,6 @@ export function AgentRunBlock({ content, isStreaming, onRetry, pseudo, model }: 
         ) : (
           <>
             <AgentStream content={content} isStreaming={isStreaming} pseudo={pseudo} model={model} />
-            {isStreaming && <span className="streaming-cursor" aria-hidden="true" />}
           </>
         )}
       </div>

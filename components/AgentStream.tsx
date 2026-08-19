@@ -263,8 +263,20 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
         );
       })}
 
-      {steps.length === 0 && plan.length === 0 && material.length === 0 && content.trim() && (
-        <div style={{ ...mono, color: "var(--fg-dim)" }}>{content.trim().slice(0, 400)}</div>
+      {steps.length === 0 && plan.length === 0 && (
+        /* Before the material lookup resolves there is nothing structured to
+         * show, and dumping the raw log here was worse than showing nothing —
+         * it is the API snippet and the query echo, which say nothing useful.
+         * Name the phase instead. */
+        <div
+          className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+          style={{ border: "1px solid var(--border)", background: "var(--bg-1)" }}
+        >
+          <Loader2Icon size={13} className="spin-slow" style={{ color: "var(--blue-500)" }} />
+          <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>
+            {material.length > 0 ? t("phasePlanning") : t("phaseLookup")}
+          </span>
+        </div>
       )}
     </div>
   );
