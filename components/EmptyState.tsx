@@ -22,10 +22,14 @@ interface Starter {
  * are DFPT sweeps; a bulk modulus is several runs plus an equation-of-state
  * fit; +U and spin-orbit each add their own way to fail.
  *
- * What is left is 1-4 atom bulk cells at high symmetry. Measured on real
- * hardware at 8 ranks, an scf of diamond Si is 0.9s and a full vc-relax 1.8s —
- * for these systems the agent's own reasoning dominates the wall clock, which
- * is the right place for a demo to spend its time.
+ * What is left is 1-4 atom CUBIC bulk cells. Cubic is not decoration: measured
+ * at 8 ranks, fcc aluminium takes 0.83s and fcc copper 2.87s, both on 72
+ * irreducible k-points, while sodium — whose Materials Project ground state is
+ * hexagonal P6_3/mmc, not the bcc everyone pictures — needs 215 for the same
+ * mesh and takes 6.91s. Lower symmetry costs more than being a metal does.
+ * Diamond silicon is 0.9s for an scf and 1.8s for a full vc-relax, so for all
+ * of these the agent's own reasoning dominates the wall clock, which is the
+ * right place for a demo to spend its time.
  *
  * The prompts also no longer dictate cutoffs and k-meshes. Choosing those is
  * the agent's job and depends on the pseudopotential library in force, so a
@@ -45,14 +49,14 @@ const ALL_STARTERS: Starter[] = [
       "Relax bulk silicon and report the equilibrium lattice constant.",
   },
   {
-    label: "Sodium",
-    sub: "bcc metal",
+    label: "NaCl",
+    sub: "ionic crystal",
     prompt:
-      "Relax bulk sodium and report the equilibrium lattice constant.",
+      "Relax bulk NaCl and report the equilibrium lattice constant.",
   },
   {
     label: "Aluminium",
-    sub: "fcc metal",
+    sub: "simple metal",
     prompt:
       "Relax bulk aluminium and report the equilibrium lattice constant.",
   },
@@ -76,7 +80,7 @@ const ALL_STARTERS: Starter[] = [
   },
   {
     label: "Copper",
-    sub: "fcc metal",
+    sub: "transition metal",
     prompt:
       "Relax bulk copper and report the equilibrium lattice constant.",
   },
