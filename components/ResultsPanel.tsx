@@ -161,7 +161,7 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-2 px-3.5 py-2.5 text-left"
-        style={{ background: "rgba(255,255,255,0.02)" }}
+        style={{ background: "var(--tint-1)" }}
       >
         {open ? <ChevronDownIcon size={15} /> : <ChevronRightIcon size={15} />}
         <span style={{ fontWeight: 600, fontSize: 13 }}>Results &amp; artifacts</span>
@@ -326,7 +326,7 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
                         alignItems: "center",
                         gap: 8,
                         padding: "7px 10px",
-                        background: openFile === f.name ? "rgba(255,255,255,0.04)" : "transparent",
+                        background: openFile === f.name ? "var(--tint-2)" : "transparent",
                         borderBottom: "1px solid var(--border)",
                         cursor: f.text ? "pointer" : "default",
                         textAlign: "left",

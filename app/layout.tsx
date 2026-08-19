@@ -47,6 +47,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
+        <script
+          // Runs before paint so a stored dark preference does not flash the
+          // light palette first. Kept inline and tiny for that reason.
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('tritondft.theme.v1')==='dark'){document.documentElement.setAttribute('data-theme','dark')}}catch(e){}`,
+          }}
+        />
       </head>
       <body>
         <AuthProvider>{children}</AuthProvider>

@@ -38,6 +38,7 @@ import { downloadMarkdown, copyMarkdown } from "@/lib/export";
 import { useAuth } from "@/lib/auth-context";
 import { LoginGate } from "@/components/LoginGate";
 import { fromThrown, tr } from "@/lib/errors";
+import { Theme, loadTheme, saveTheme, applyTheme } from "@/lib/theme";
 
 const ACTIVITY_WIDTH_KEY = "tritondft.activityWidth.v1";
 const ACTIVITY_MIN = 260;
@@ -80,6 +81,7 @@ export default function Page() {
   // different conversations can each have a job running at the same time.
   const [streamingConvs, setStreamingConvs] = useState<Set<string>>(new Set());
   const [lang, setLang] = useState<Lang>("en");
+  const [theme, setTheme] = useState<Theme>("light");
   const [backendUrl, setBackendUrl] = useState<string>("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [promptsOpen, setPromptsOpen] = useState(false);
@@ -94,6 +96,9 @@ export default function Page() {
     setLang(lng);
     i18n.changeLanguage(lng);
     setBackendUrl(loadBackendUrl());
+    const th = loadTheme();
+    setTheme(th);
+    applyTheme(th);
     if (typeof window !== "undefined") {
       const w = parseInt(localStorage.getItem(ACTIVITY_WIDTH_KEY) || "", 10);
       if (!Number.isNaN(w) && w >= ACTIVITY_MIN && w <= ACTIVITY_MAX) setActivityWidth(w);
@@ -542,6 +547,13 @@ export default function Page() {
     submitPlanAction(p.jobId, { action: "cancel" }).catch(() => {});
   }, [activeId, planReviews, closePlanReview]);
 
+  const toggleTheme = useCallback(() => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    saveTheme(next);
+    applyTheme(next);
+  }, [theme]);
+
   const toggleLang = useCallback(() => {
     const next: Lang = lang === "en" ? "zh" : "en";
     setLang(next);
@@ -634,6 +646,8 @@ export default function Page() {
         <TopBar
           lang={lang}
           onToggleLang={toggleLang}
+          theme={theme}
+          onToggleTheme={toggleTheme}
           onOpenSettings={() => setSettingsOpen(true)}
           hasConversation={!!active && active.messages.length > 0}
           panelOpen={panelOpen}

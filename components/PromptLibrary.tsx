@@ -98,7 +98,7 @@ export function PromptLibrary({ open, prompts, onClose, onPick, onChange }: Prop
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 anim-slide-in"
-      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}
+      style={{ background: "var(--scrim)", backdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
       <div
@@ -106,7 +106,7 @@ export function PromptLibrary({ open, prompts, onClose, onPick, onChange }: Prop
         style={{
           background: "var(--bg-1)",
           border: "1px solid var(--border-strong)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+          boxShadow: "0 20px 60px var(--scrim)",
           maxHeight: "min(78vh, 720px)",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -130,7 +130,7 @@ export function PromptLibrary({ open, prompts, onClose, onPick, onChange }: Prop
             onClick={onClose}
             className="p-1.5 rounded-md transition"
             style={{ color: "var(--fg-dim)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--tint-3)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             <XIcon size={16} />
@@ -158,7 +158,7 @@ export function PromptLibrary({ open, prompts, onClose, onPick, onChange }: Prop
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-white"
             style={{
               background: "var(--grad-primary)",
-              boxShadow: "0 0 0 1px rgba(255,255,255,0.1) inset",
+              boxShadow: "0 0 0 1px var(--tint-4) inset",
               opacity: creating ? 0.5 : 1,
             }}
           >

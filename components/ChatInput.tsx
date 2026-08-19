@@ -112,7 +112,7 @@ export function ChatInput({ value, onChange, onSend, onStop, isStreaming, lastUs
           title={t("send")}
           className="rounded-lg text-white transition flex-shrink-0 inline-flex items-center justify-center"
           style={{
-            background: canSend ? "var(--grad-primary)" : "rgba(255,255,255,0.06)",
+            background: canSend ? "var(--grad-primary)" : "var(--tint-3)",
             color: canSend ? "white" : "var(--fg-dim)",
             cursor: canSend ? "pointer" : "not-allowed",
             boxShadow: canSend ? "0 6px 14px rgba(69, 119, 255, 0.3)" : "none",

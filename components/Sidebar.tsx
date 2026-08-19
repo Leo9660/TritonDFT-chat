@@ -241,7 +241,7 @@ export function Sidebar(props: Props) {
           className="w-full flex items-center gap-2 justify-center py-2.5 rounded-lg text-white font-medium text-sm transition"
           style={{
             background: "var(--grad-primary)",
-            boxShadow: "0 0 0 1px rgba(255,255,255,0.1) inset",
+            boxShadow: "0 0 0 1px var(--tint-4) inset",
           }}
           onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
           onMouseLeave={(e) => (e.currentTarget.style.transform = "")}
@@ -370,16 +370,16 @@ function SecondaryButton({ onClick, icon, label }: { onClick: () => void; icon: 
       onClick={onClick}
       className="flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs transition"
       style={{
-        background: "rgba(255,255,255,0.03)",
+        background: "var(--tint-2)",
         border: "1px solid var(--border)",
         color: "var(--fg-mute)",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+        e.currentTarget.style.background = "var(--tint-3)";
         e.currentTarget.style.color = "var(--fg)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+        e.currentTarget.style.background = "var(--tint-2)";
         e.currentTarget.style.color = "var(--fg-mute)";
       }}
     >
@@ -440,7 +440,7 @@ function FolderRow({
     <div className="mb-1">
       <div
         className="group flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer transition"
-        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--tint-2)")}
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         onClick={onToggle}
       >
@@ -569,7 +569,7 @@ function ChatItem({
         paddingLeft: active ? "8px" : "10px",
       }}
       onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+        if (!active) e.currentTarget.style.background = "var(--tint-2)";
       }}
       onMouseLeave={(e) => {
         if (!active) e.currentTarget.style.background = "transparent";
@@ -685,7 +685,7 @@ function MenuRow({
       onClick={onClick}
       className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition"
       style={{ color: danger ? "#fca5a5" : "var(--fg)" }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = danger ? "rgba(239, 68, 68, 0.08)" : "rgba(255,255,255,0.05)")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = danger ? "rgba(239, 68, 68, 0.08)" : "var(--tint-3)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <span style={{ color: danger ? "#ef4444" : "var(--fg-mute)" }}>{icon}</span>

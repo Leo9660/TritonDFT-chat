@@ -47,7 +47,7 @@ export function SettingsDialog({ open, backendUrl, onClose, onSave }: Props) {
             style={{ color: "var(--fg-dim)" }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = "var(--fg)";
-              e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+              e.currentTarget.style.background = "var(--tint-3)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.color = "var(--fg-dim)";
@@ -83,7 +83,7 @@ export function SettingsDialog({ open, backendUrl, onClose, onSave }: Props) {
             onClick={onClose}
             className="px-4 py-2 rounded-lg transition text-sm"
             style={{ color: "var(--fg-mute)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--tint-2)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             {t("cancel")}
@@ -93,7 +93,7 @@ export function SettingsDialog({ open, backendUrl, onClose, onSave }: Props) {
             className="px-4 py-2 rounded-lg text-white font-medium text-sm transition"
             style={{
               background: "var(--grad-primary)",
-              boxShadow: "0 0 0 1px rgba(255,255,255,0.1) inset",
+              boxShadow: "0 0 0 1px var(--tint-4) inset",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "")}

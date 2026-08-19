@@ -1,14 +1,17 @@
 "use client";
 
-import { SettingsIcon, GlobeIcon, ExternalLinkIcon } from "lucide-react";
+import { SettingsIcon, GlobeIcon, ExternalLinkIcon, SunIcon, MoonIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Lang } from "@/lib/types";
+import type { Theme } from "@/lib/theme";
 import { ChatMenu } from "./ChatMenu";
 import { UserMenu } from "./UserMenu";
 
 interface Props {
   lang: Lang;
   onToggleLang: () => void;
+  theme: Theme;
+  onToggleTheme: () => void;
   onOpenSettings: () => void;
   hasConversation: boolean;
   panelOpen: boolean;
@@ -20,6 +23,8 @@ interface Props {
 export function TopBar({
   lang,
   onToggleLang,
+  theme,
+  onToggleTheme,
   onOpenSettings,
   hasConversation,
   panelOpen,
@@ -69,6 +74,15 @@ export function TopBar({
         </span>
       </div>
       <div className="flex items-center gap-1">
+        <button
+          onClick={onToggleTheme}
+          className="p-1.5 rounded-md transition"
+          style={{ color: "var(--fg-mute)" }}
+          title={theme === "dark" ? "Switch to light" : "Switch to dark"}
+          aria-label="Toggle colour theme"
+        >
+          {theme === "dark" ? <SunIcon size={15} /> : <MoonIcon size={15} />}
+        </button>
         <a
           href="https://tritondft.com"
           target="_blank"
@@ -87,7 +101,7 @@ export function TopBar({
           title="Toggle language"
           className="flex items-center gap-1 px-2.5 py-1 rounded-md text-sm transition"
           style={{ color: "var(--fg-mute)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--tint-2)")}
           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
           <GlobeIcon size={14} />
@@ -98,7 +112,7 @@ export function TopBar({
           title={t("settings")}
           className="p-1.5 rounded-md transition"
           style={{ color: "var(--fg-mute)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--tint-2)")}
           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
           <SettingsIcon size={16} />

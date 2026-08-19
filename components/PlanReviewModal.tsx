@@ -111,14 +111,14 @@ export function PlanReviewModal({ open, pending, onApprove, onSuggest, onCancel 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4 anim-slide-in"
-      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
+      style={{ background: "var(--scrim)", backdropFilter: "blur(8px)" }}
     >
       <div
         className="w-full max-w-2xl rounded-2xl flex flex-col"
         style={{
           background: "var(--bg-1)",
           border: "1px solid var(--border-strong)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+          boxShadow: "0 20px 60px var(--scrim)",
           maxHeight: "min(86vh, 780px)",
         }}
       >
@@ -295,7 +295,7 @@ export function PlanReviewModal({ open, pending, onApprove, onSuggest, onCancel 
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-white font-medium text-sm transition"
               style={{
                 background: "var(--grad-primary)",
-                boxShadow: "0 0 0 1px rgba(255,255,255,0.1) inset",
+                boxShadow: "0 0 0 1px var(--tint-4) inset",
                 opacity: steps.length === 0 ? 0.45 : 1,
               }}
             >

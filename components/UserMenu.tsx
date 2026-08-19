@@ -36,7 +36,7 @@ export function UserMenu() {
           gap: 8,
           padding: "4px 10px 4px 4px",
           borderRadius: 999,
-          background: "rgba(255,255,255,0.04)",
+          background: "var(--tint-2)",
           border: "1px solid var(--border)",
           color: "var(--fg)",
           fontSize: 13,
@@ -114,7 +114,7 @@ export function UserMenu() {
                 borderRadius: 6,
                 textDecoration: "none",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--tint-2)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
               <ShieldCheckIcon size={14} />

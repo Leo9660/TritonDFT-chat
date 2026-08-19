@@ -50,7 +50,7 @@ export function ChatMenu({ hasConversation, panelOpen, onTogglePanel, onExport, 
         title="More"
         className="p-1.5 rounded-md transition"
         style={{ color: "var(--fg-mute)" }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--tint-2)")}
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
         <MoreVerticalIcon size={16} />
@@ -62,7 +62,7 @@ export function ChatMenu({ hasConversation, panelOpen, onTogglePanel, onExport, 
             zIndex: 60,
             background: "var(--bg-1)",
             border: "1px solid var(--border-strong)",
-            boxShadow: "0 20px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
+            boxShadow: "0 20px 40px var(--scrim), 0 0 0 1px var(--tint-2)",
             minWidth: 220,
           }}
         >
@@ -104,7 +104,7 @@ function MenuItem({ icon, label, onClick }: { icon: React.ReactNode; label: stri
       onClick={onClick}
       className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition"
       style={{ color: "var(--fg)" }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--tint-3)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <span style={{ color: "var(--fg-mute)" }}>{icon}</span>

@@ -1,45 +1,106 @@
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
-@import "highlight.js/styles/github-dark.css";
+@import "highlight.js/styles/github.css";
 
 /* ──────────────────  THEME TOKENS  ────────────────── */
 :root {
-  --bg-0: #07080d;
-  --bg-1: #0d1018;
-  --bg-2: #131625;
-  --bg-elev: #181b2a;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.18);
-  --fg: #e8eaf2;
-  --fg-mute: #9fa5b9;
-  --fg-dim: #5b6178;
+  /* ── LIGHT (default) ──────────────────────────────────────────────────────
+     A warm paper scale rather than white-on-grey: separation comes from small
+     lightness steps, so panels read as layers instead of boxes with hard edges.
+     Text tops out at #26241f rather than black — full contrast is tiring to
+     read against a light field, and the hierarchy stays legible without it. */
+  --bg-0: #f6f5f2;      /* page */
+  --bg-1: #fbfaf8;      /* panels — lighter than the page, so they lift */
+  --bg-2: #efede8;      /* inset / hover */
+  --bg-elev: #ffffff;   /* modals */
 
-  --blue-100: #c9d8ff;
-  --blue-500: #4577ff;
-  --blue-600: #2b5bff;
-  --blue-700: #1e40af;
-  --amber-400: #fbbf24;
-  --amber-500: #f59e0b;
-  --green-500: #10b981;
+  /* Overlays are ink-on-paper in light, light-on-ink in dark. Components use
+     these instead of hardcoding rgba(255,255,255,…), which only works on dark. */
+  --tint-1: rgba(28, 25, 20, 0.018);
+  --tint-2: rgba(28, 25, 20, 0.035);
+  --tint-3: rgba(28, 25, 20, 0.07);
+  --tint-4: rgba(28, 25, 20, 0.13);
 
-  --grad-primary: linear-gradient(135deg, #4577ff 0%, #1e40af 60%, #0b1e6e 100%);
-  --grad-amber: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
-  --grad-rainbow: linear-gradient(90deg, #4577ff 0%, #a855f7 50%, #fbbf24 100%);
+  --border: var(--tint-3);
+  --border-strong: var(--tint-4);
+  --fg: #26241f;
+  --fg-mute: #6b675f;
+  --fg-dim: #9a958b;
+
+  /* Accents are desaturated for a light field — the dark-theme blue vibrates
+     against warm paper. */
+  --blue-100: #3a53a8;
+  --blue-500: #3f63c4;
+  --blue-600: #33529f;
+  --blue-700: #27407c;
+  --amber-400: #a8760f;
+  --amber-500: #8f6410;
+  --green-500: #2f7d5c;
+
+  --grad-primary: linear-gradient(135deg, #4f70cc 0%, #3f63c4 60%, #33529f 100%);
+  --grad-amber: linear-gradient(135deg, #c08b1c 0%, #a8760f 50%, #8f6410 100%);
+  --grad-rainbow: linear-gradient(90deg, #3f63c4 0%, #7d5ba6 50%, #a8760f 100%);
+
+  --page-glow-a: rgba(63, 99, 196, 0.05);
+  --page-glow-b: rgba(168, 118, 15, 0.035);
+  --code-bg: #f2f0ec;
+  --shadow-panel: 0 6px 18px rgba(40, 35, 25, 0.07);
+  --shadow-modal: 0 20px 60px rgba(40, 35, 25, 0.18);
+  --scrim: rgba(40, 35, 25, 0.32);
 
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-serif: "Instrument Serif", "Georgia", serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
-  /* Legacy aliases (kept so existing components compile) */
   --bg: var(--bg-0);
   --muted: var(--fg-mute);
   --accent: var(--blue-500);
 }
 
+/* ── DARK ─────────────────────────────────────────────────────────────────
+   Same token names, inverted roles. Only the palette is redefined so every
+   component keeps working untouched. */
+:root[data-theme="dark"] {
+  --bg-0: #0b0c11;
+  --bg-1: #121419;
+  --bg-2: #191c23;
+  --bg-elev: #1e212a;
+
+  --tint-1: rgba(255, 255, 255, 0.02);
+  --tint-2: rgba(255, 255, 255, 0.04);
+  --tint-3: rgba(255, 255, 255, 0.075);
+  --tint-4: rgba(255, 255, 255, 0.15);
+
+  --border: var(--tint-3);
+  --border-strong: var(--tint-4);
+  --fg: #e2e4ea;
+  --fg-mute: #9a9fae;
+  --fg-dim: #6a6f80;
+
+  --blue-100: #b9caf6;
+  --blue-500: #6c8ce0;
+  --blue-600: #5a79cf;
+  --blue-700: #3f5aa8;
+  --amber-400: #e0ad5a;
+  --amber-500: #cf9a45;
+  --green-500: #5cb894;
+
+  --grad-primary: linear-gradient(135deg, #6c8ce0 0%, #4a68c0 60%, #2f4a86 100%);
+  --grad-amber: linear-gradient(135deg, #e0ad5a 0%, #cf9a45 50%, #a87a2e 100%);
+  --grad-rainbow: linear-gradient(90deg, #6c8ce0 0%, #9b7fc4 50%, #e0ad5a 100%);
+
+  --page-glow-a: rgba(108, 140, 224, 0.06);
+  --page-glow-b: rgba(224, 173, 90, 0.03);
+  --code-bg: #0e1116;
+  --shadow-panel: 0 8px 22px rgba(0, 0, 0, 0.3);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.55);
+  --scrim: rgba(5, 6, 9, 0.62);
+}
+
 html, body {
   background:
-    radial-gradient(900px 500px at 80% -200px, rgba(69, 119, 255, 0.08), transparent 70%),
-    radial-gradient(700px 350px at 10% 120%, rgba(245, 158, 11, 0.04), transparent 70%),
+    radial-gradient(900px 500px at 80% -200px, var(--page-glow-a), transparent 70%),
+    radial-gradient(700px 350px at 10% 120%, var(--page-glow-b), transparent 70%),
     var(--bg-0);
   color: var(--fg);
   font-family: var(--font-sans);
@@ -61,12 +122,12 @@ button:not(:disabled),
 /* Scrollbars */
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
-*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
+*::-webkit-scrollbar-thumb { background: var(--tint-3); border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--tint-4); }
 
 /* ──────────────────  MARKDOWN PROSE  ────────────────── */
 .prose-msg pre {
-  background: #0a0d14;
+  background: var(--code-bg);
   padding: 0.75rem 0.9rem;
   border-radius: 8px;
   overflow-x: auto;
@@ -75,7 +136,7 @@ button:not(:disabled),
   margin: 0.5rem 0;
 }
 .prose-msg code:not(pre code) {
-  background: rgba(255,255,255,0.06);
+  background: var(--tint-3);
   padding: 0.1rem 0.36rem;
   border-radius: 4px;
   font-size: 0.85em;
@@ -92,7 +153,7 @@ button:not(:disabled),
 .prose-msg blockquote { border-left: 3px solid var(--border-strong); padding-left: 0.8rem; color: var(--fg-mute); margin: 0.5rem 0; }
 .prose-msg table { border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9em; }
 .prose-msg th, .prose-msg td { border: 1px solid var(--border); padding: 0.35rem 0.7rem; }
-.prose-msg th { background: rgba(255,255,255,0.04); }
+.prose-msg th { background: var(--tint-2); }
 .prose-msg a { color: var(--blue-100); text-decoration: underline; text-decoration-color: rgba(201, 216, 255, 0.4); transition: text-decoration-color .15s; }
 .prose-msg a:hover { text-decoration-color: var(--blue-100); }
 
@@ -106,8 +167,8 @@ button:not(:disabled),
   padding: 1px 6px;
   margin-right: 6px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--tint-3);
+  border: 1px solid var(--tint-3);
   vertical-align: 1px;
   letter-spacing: 0.02em;
 }
@@ -136,7 +197,7 @@ button:not(:disabled),
   background: var(--bg-1);
   border: 1px solid var(--border);
   overflow: hidden;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.25);
+  box-shadow: var(--shadow-panel);
 }
 .agent-run-header {
   display: flex;
@@ -151,7 +212,7 @@ button:not(:disabled),
 .agent-run-dots { display: flex; gap: 5px; flex-shrink: 0; }
 .agent-run-dots span {
   width: 10px; height: 10px; border-radius: 50%;
-  background: rgba(255,255,255,0.18);
+  background: var(--tint-4);
 }
 .agent-run-dots span:nth-child(1) { background: rgba(239, 68, 68, 0.55); }
 .agent-run-dots span:nth-child(2) { background: rgba(245, 158, 11, 0.55); }
@@ -342,7 +403,7 @@ button:not(:disabled),
   color: var(--fg-dim);
   transition: background .15s, color .15s;
 }
-.activity-close-btn:hover { color: var(--fg); background: rgba(255,255,255,0.06); }
+.activity-close-btn:hover { color: var(--fg); background: var(--tint-3); }
 
 /* Compact 1-line status row */
 .activity-status-row {
@@ -440,7 +501,7 @@ button:not(:disabled),
   transition: background .12s;
   min-width: 0;
 }
-.activity-phase-head:hover { background: rgba(255,255,255,0.04); }
+.activity-phase-head:hover { background: var(--tint-2); }
 .activity-phase-chev {
   flex-shrink: 0;
   color: var(--fg-dim);
@@ -481,7 +542,7 @@ button:not(:disabled),
   padding: 1px 5px;
   border: 1px solid var(--border-strong);
   border-radius: 3px;
-  background: rgba(255,255,255,0.03);
+  background: var(--tint-2);
 }
 .activity-phase-title {
   flex: 1;
@@ -602,7 +663,7 @@ button:not(:disabled),
 .activity-progress-track {
   height: 2px;
   margin: 0 16px 8px;
-  background: rgba(255,255,255,0.04);
+  background: var(--tint-2);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -653,12 +714,12 @@ button:not(:disabled),
   gap: 8px;
   padding: 6px 10px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--tint-1);
+  border: 1px solid var(--tint-2);
   transition: background .15s;
 }
 .agent-step:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--tint-2);
 }
 .agent-step.is-error {
   background: rgba(239, 68, 68, 0.06);
@@ -809,3 +870,18 @@ button:not(:disabled),
     transition-duration: 0.01ms !important;
   }
 }
+
+/* highlight.js ships a fixed palette per stylesheet, so the dark theme restates
+   the few tokens that would otherwise stay light-on-light. */
+:root[data-theme="dark"] .hljs { background: var(--code-bg); color: #d6dae3; }
+:root[data-theme="dark"] .hljs-comment,
+:root[data-theme="dark"] .hljs-quote { color: #7c8394; }
+:root[data-theme="dark"] .hljs-keyword,
+:root[data-theme="dark"] .hljs-selector-tag,
+:root[data-theme="dark"] .hljs-literal { color: #c58fd4; }
+:root[data-theme="dark"] .hljs-string,
+:root[data-theme="dark"] .hljs-attr { color: #8fc9a0; }
+:root[data-theme="dark"] .hljs-number,
+:root[data-theme="dark"] .hljs-built_in { color: #e0ad5a; }
+:root[data-theme="dark"] .hljs-title,
+:root[data-theme="dark"] .hljs-name { color: #6c8ce0; }

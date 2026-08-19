@@ -56,7 +56,7 @@ export function LoginGate() {
           borderRadius: 16,
           background: "var(--bg-1)",
           border: "1px solid var(--border-strong)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          boxShadow: "var(--shadow-modal)",
         }}
       >
         <div style={{ textAlign: "center", marginBottom: 20 }}>

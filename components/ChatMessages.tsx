@@ -106,7 +106,7 @@ function MessageBubbleImpl({
           className="rounded-2xl px-4 py-2.5 text-white whitespace-pre-wrap"
           style={{
             background: "var(--grad-primary)",
-            boxShadow: "0 0 0 1px rgba(255,255,255,0.08) inset, 0 8px 22px rgba(69, 119, 255, 0.18)",
+            boxShadow: "0 0 0 1px var(--tint-3) inset, 0 8px 22px rgba(69, 119, 255, 0.18)",
           }}
         >
           {message.content}

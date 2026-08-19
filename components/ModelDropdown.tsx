@@ -98,7 +98,7 @@ export function ModelDropdown({
                   cursor: "pointer",
                 }}
                 onMouseEnter={(e) => {
-                  if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                  if (!active) e.currentTarget.style.background = "var(--tint-3)";
                 }}
                 onMouseLeave={(e) => {
                   if (!active) e.currentTarget.style.background = "transparent";

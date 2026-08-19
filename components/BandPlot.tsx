@@ -98,7 +98,7 @@ export function BandPlot({ data }: { data: BandData }) {
           y={pad.t}
           width={plotW}
           height={plotH}
-          fill="rgba(255,255,255,0.02)"
+          fill="var(--tint-1)"
           stroke="var(--border)"
         />
 
