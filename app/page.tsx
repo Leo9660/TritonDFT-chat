@@ -16,7 +16,7 @@ import { PromptLibrary } from "@/components/PromptLibrary";
 import { ScriptApprovalModal } from "@/components/ScriptApprovalModal";
 import { PlanReviewModal } from "@/components/PlanReviewModal";
 
-import { Conversation, Folder, Lang, Message, PromptTemplate, Mode, PendingStep, PendingScript, PendingPlan } from "@/lib/types";
+import { Conversation, Folder, Lang, Message, PromptTemplate, Mode, PendingStep, PendingScript, PendingPlan, PseudoChoice, DEFAULT_PSEUDO } from "@/lib/types";
 import {
   loadConversations,
   saveConversations,
@@ -61,6 +61,7 @@ export default function Page() {
   const [draftScriptOnly, setDraftScriptOnly] = useState<boolean>(true);
   const [draftMode, setDraftMode] = useState<Mode>("auto");
   const [draftPlots, setDraftPlots] = useState<boolean>(false);
+  const [draftPseudo, setDraftPseudo] = useState<PseudoChoice>(DEFAULT_PSEUDO);
   // Steps awaiting the user's review, keyed by conversation id (assistant mode).
   const [approvals, setApprovals] = useState<Map<string, { pending: PendingStep; jobId: string }>>(
     new Map(),
@@ -143,6 +144,7 @@ export default function Page() {
   const scriptOnly = canUseCpu ? (active?.scriptOnly ?? draftScriptOnly) : true;
   const mode: Mode = active?.mode ?? draftMode;
   const plots: boolean = active?.plots ?? draftPlots;
+  const pseudo: PseudoChoice = active?.pseudo ?? draftPseudo;
 
   const onToggleMode = useCallback(() => {
     const next: Mode = mode === "assistant" ? "auto" : "assistant";
@@ -165,6 +167,14 @@ export default function Page() {
       setDraftPlots(next);
     }
   }, [plots, activeId]);
+
+  const onPseudoChange = useCallback((next: PseudoChoice) => {
+    if (activeId) {
+      setConversations((cs) => cs.map((c) => (c.id === activeId ? { ...c, pseudo: next } : c)));
+    } else {
+      setDraftPseudo(next);
+    }
+  }, [activeId]);
 
   const onToggleScriptOnly = useCallback(() => {
     if (!canUseCpu) return;
@@ -420,10 +430,10 @@ export default function Page() {
           // refund or revealed a balance change.
           auth.refresh();
         },
-      }, { model, scriptOnly: effectiveScriptOnly, mode, plots });
+      }, { model, scriptOnly: effectiveScriptOnly, mode, plots, pseudo });
       jobHandles.current.set(convId, handle);
     },
-    [input, activeId, active, backendUrl, auth, streamingConvs, canUseCpu, model, scriptOnly, mode, plots],
+    [input, activeId, active, backendUrl, auth, streamingConvs, canUseCpu, model, scriptOnly, mode, plots, pseudo],
   );
 
   // Regenerate: drop the trailing assistant msg (and trailing user-only artifacts)
@@ -617,6 +627,8 @@ export default function Page() {
         onToggleMode={onToggleMode}
         plots={plots}
         onTogglePlots={onTogglePlots}
+        pseudo={pseudo}
+        onPseudoChange={onPseudoChange}
       />
       <main className="flex-1 flex flex-col min-w-0">
         <TopBar

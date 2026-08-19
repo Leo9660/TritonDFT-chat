@@ -50,6 +50,28 @@ export interface PendingPlan {
   steps: PlanStep[];
 }
 
+/** The three axes of the PseudoDojo library tree. */
+export type Xc = "LDA" | "PBE" | "PBEsol";
+export type Relativistic = "SR" | "FR";
+export type Accuracy = "standard" | "stringent";
+
+export interface PseudoChoice {
+  xc: Xc;
+  relativistic: Relativistic;
+  accuracy: Accuracy;
+}
+
+/** PseudoDojo publishes no fully-relativistic LDA library. */
+export function pseudoAvailable(xc: Xc, rel: Relativistic): boolean {
+  return !(xc === "LDA" && rel === "FR");
+}
+
+export const DEFAULT_PSEUDO: PseudoChoice = {
+  xc: "PBE",
+  relativistic: "SR",
+  accuracy: "standard",
+};
+
 export interface Conversation {
   id: string;
   title: string;
@@ -65,6 +87,8 @@ export interface Conversation {
   mode?: Mode;
   /** Experimental: render plots and show extracted values (band gap, energy). */
   plots?: boolean;
+  /** Pseudopotential library choice. Undefined = backend default (PBE/SR/standard). */
+  pseudo?: PseudoChoice;
 }
 
 export interface Folder {

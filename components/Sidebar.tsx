@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { LineChart as LineChartIcon } from "lucide-react";
-import { Conversation, Folder, Mode } from "@/lib/types";
+import { Conversation, Folder, Mode, PseudoChoice } from "@/lib/types";
+import { PseudoPicker } from "./PseudoPicker";
 import { cn } from "@/lib/utils";
 import { ModelDropdown } from "./ModelDropdown";
 
@@ -51,6 +52,8 @@ interface Props {
   onToggleMode: () => void;
   plots: boolean;
   onTogglePlots: () => void;
+  pseudo: PseudoChoice;
+  onPseudoChange: (p: PseudoChoice) => void;
 }
 
 function relativeTime(ts: number, locale: string): string {
@@ -104,6 +107,8 @@ export function Sidebar(props: Props) {
     onToggleMode,
     plots,
     onTogglePlots,
+    pseudo,
+    onPseudoChange,
   } = props;
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState("");
@@ -207,7 +212,10 @@ export function Sidebar(props: Props) {
           </button>
         </div>
 
-        {/* 4. Plots — experimental. Off by default: the extraction is new, and a
+        {/* 4. Pseudopotentials — enforced by the backend, see PseudoPicker. */}
+        <PseudoPicker value={pseudo} onChange={onPseudoChange} disabled={controlsDisabled} />
+
+        {/* 5. Plots — experimental. Off by default: the extraction is new, and a
             wrong plot is worse than no plot. Gates the derived result values
             (band gap, energy) too, so with it off the user sees only the log and
             the downloadable files. */}

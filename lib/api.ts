@@ -1,4 +1,4 @@
-import { Message, Mode, PendingStep, PendingPlan, PlanStep } from "./types";
+import { Message, Mode, PendingStep, PendingPlan, PlanStep, PseudoChoice } from "./types";
 import { ApiError, loadToken, authFetch } from "./auth";
 import { parseError, ParsedError } from "./errors";
 
@@ -70,6 +70,8 @@ export interface JobOptions {
   mode?: Mode;
   /** Experimental: render plots and surface extracted values. */
   plots?: boolean;
+  /** Pseudopotential library. Omitted = backend default. */
+  pseudo?: PseudoChoice;
 }
 
 export function runJob(
@@ -228,6 +230,7 @@ export function runJob(
           ...(opts.scriptOnly != null ? { script_only: opts.scriptOnly } : {}),
           ...(opts.mode ? { mode: opts.mode } : {}),
           ...(opts.plots != null ? { plots: opts.plots } : {}),
+          ...(opts.pseudo ? { pseudo_choice: opts.pseudo } : {}),
         }),
       });
       if (!resp.ok) {
