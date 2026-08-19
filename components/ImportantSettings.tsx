@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SlidersHorizontal } from "lucide-react";
 import {
@@ -31,13 +30,9 @@ const ACC: Accuracy[] = ["standard", "stringent"];
  */
 export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
   const { t } = useTranslation();
-  // Names the axis that was auto-moved, so a silent correction is visible.
-  const [autoMoved, setAutoMoved] = useState<string | null>(null);
-
   function pick(next: Partial<PseudoChoice>) {
     const merged = { ...pseudo, ...next };
     if (pseudoAvailable(merged.xc, merged.relativistic)) {
-      setAutoMoved(null);
       onPseudoChange(merged);
       return;
     }
@@ -52,7 +47,6 @@ export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
     } else if (next.relativistic !== undefined) {
       merged.xc = XC.find((x) => pseudoAvailable(x, merged.relativistic)) ?? merged.xc;
     }
-    setAutoMoved(next.xc !== undefined ? merged.relativistic : merged.xc);
     onPseudoChange(merged);
   }
 
@@ -120,12 +114,6 @@ export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
           <span>{t("pseudoAxisRel")}</span>
           <span>{t("pseudoAxisAcc")}</span>
         </div>
-
-        {autoMoved && (
-          <div className="text-[10px] mt-1.5" style={{ color: "#fbbf24" }}>
-            {t("pseudoAutoMoved", { value: autoMoved })}
-          </div>
-        )}
 
         <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid var(--border)" }}>
           <div className="text-[10px]" style={{ color: "var(--fg-mute)", fontFamily: "var(--font-mono)" }}>
