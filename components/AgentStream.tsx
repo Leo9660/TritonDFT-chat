@@ -371,24 +371,35 @@ export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Prop
           title={t("planTitle")}
           right={<span style={{ ...mono, color: "var(--fg-dim)" }}>{plan.length} {t("stepsWord")}</span>}
           subtitle={
-            /* Its own row. Sharing the header line with the title and the step
-               count left the chain fighting for width and colliding with them. */
+            /* Its own row, six steps to a line.
+             *
+             * Letting it reflow on container width put a dozen steps on one
+             * line on a wide screen, which is hard to count even though it
+             * fits. A fixed six keeps every row the same length to scan, and
+             * each row still wraps on its own if the panel gets narrow. */
             <span
               style={{
-                // Wraps rather than truncating: a long workflow is exactly the
-                // one you most need to see all of, and an ellipsis would hide
-                // the post-processing steps at the end.
-                ...mono, display: "block", marginTop: 3, color: "var(--fg-mute)",
-                lineHeight: 1.7, whiteSpace: "normal",
+                ...mono, display: "block", marginTop: 3,
+                color: "var(--fg-mute)", lineHeight: 1.75,
               }}
             >
-              {plan.map((p, i) => (
-                // Each step is one unbreakable unit so a wrap never splits
-                // "3 nscf" across two lines.
-                <span key={p.index} style={{ whiteSpace: "nowrap" }}>
-                  {i > 0 && <span style={{ color: "var(--fg-dim)", margin: "0 5px" }}>→</span>}
-                  <span style={{ color: "var(--fg-dim)" }}>{i + 1} </span>
-                  {shortStep(p.binary)}
+              {Array.from({ length: Math.ceil(plan.length / 6) }, (_, row) => (
+                <span key={row} style={{ display: "block" }}>
+                  {plan.slice(row * 6, row * 6 + 6).map((p, j) => {
+                    const i = row * 6 + j;
+                    return (
+                      // One unbreakable unit, so a wrap never splits "3 nscf".
+                      <span key={p.index} style={{ whiteSpace: "nowrap" }}>
+                        {i > 0 && (
+                          <span style={{ color: "var(--fg-dim)", margin: "0 5px" }}>
+                            {j === 0 ? "↳" : "→"}
+                          </span>
+                        )}
+                        <span style={{ color: "var(--fg-dim)" }}>{i + 1} </span>
+                        {shortStep(p.binary)}
+                      </span>
+                    );
+                  })}
                 </span>
               ))}
             </span>
