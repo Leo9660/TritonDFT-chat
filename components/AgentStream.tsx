@@ -375,12 +375,17 @@ export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Prop
                count left the chain fighting for width and colliding with them. */
             <span
               style={{
+                // Wraps rather than truncating: a long workflow is exactly the
+                // one you most need to see all of, and an ellipsis would hide
+                // the post-processing steps at the end.
                 ...mono, display: "block", marginTop: 3, color: "var(--fg-mute)",
-                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                lineHeight: 1.7, whiteSpace: "normal",
               }}
             >
               {plan.map((p, i) => (
-                <span key={p.index}>
+                // Each step is one unbreakable unit so a wrap never splits
+                // "3 nscf" across two lines.
+                <span key={p.index} style={{ whiteSpace: "nowrap" }}>
                   {i > 0 && <span style={{ color: "var(--fg-dim)", margin: "0 5px" }}>→</span>}
                   <span style={{ color: "var(--fg-dim)" }}>{i + 1} </span>
                   {shortStep(p.binary)}
