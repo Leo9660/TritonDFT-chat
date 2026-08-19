@@ -1,8 +1,9 @@
 "use client";
 
 import { SettingsIcon, GlobeIcon, ExternalLinkIcon } from "lucide-react";
+import { ImportantSettings } from "./ImportantSettings";
 import { useTranslation } from "react-i18next";
-import { Lang } from "@/lib/types";
+import { Lang, PseudoChoice } from "@/lib/types";
 import { ChatMenu } from "./ChatMenu";
 import { UserMenu } from "./UserMenu";
 
@@ -15,6 +16,9 @@ interface Props {
   onTogglePanel: () => void;
   onExport: () => void;
   onCopy: () => Promise<void>;
+  pseudo: PseudoChoice;
+  onPseudoChange: (p: PseudoChoice) => void;
+  settingsDisabled?: boolean;
 }
 
 export function TopBar({
@@ -26,6 +30,9 @@ export function TopBar({
   onTogglePanel,
   onExport,
   onCopy,
+  pseudo,
+  onPseudoChange,
+  settingsDisabled,
 }: Props) {
   const { t } = useTranslation();
   return (
@@ -69,6 +76,11 @@ export function TopBar({
         </span>
       </div>
       <div className="flex items-center gap-1">
+        <ImportantSettings
+          pseudo={pseudo}
+          onPseudoChange={onPseudoChange}
+          disabled={settingsDisabled}
+        />
         <a
           href="https://tritondft.com"
           target="_blank"

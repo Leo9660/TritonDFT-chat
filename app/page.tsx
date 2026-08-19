@@ -627,8 +627,6 @@ export default function Page() {
         onToggleMode={onToggleMode}
         plots={plots}
         onTogglePlots={onTogglePlots}
-        pseudo={pseudo}
-        onPseudoChange={onPseudoChange}
       />
       <main className="flex-1 flex flex-col min-w-0">
         <TopBar
@@ -638,6 +636,9 @@ export default function Page() {
           hasConversation={!!active && active.messages.length > 0}
           panelOpen={panelOpen}
           onTogglePanel={() => setPanelOpen((x) => !x)}
+          pseudo={pseudo}
+          onPseudoChange={onPseudoChange}
+          settingsDisabled={activeStreaming}
           onExport={() => { if (active) downloadMarkdown(active); }}
           onCopy={async () => { if (active) await copyMarkdown(active); }}
         />
