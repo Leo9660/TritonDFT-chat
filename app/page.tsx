@@ -659,6 +659,7 @@ export default function Page() {
           <EmptyState onPrompt={(text) => sendMessage(text)} />
         ) : (
           <ChatMessages
+            convId={active!.id}
             messages={active!.messages}
             isStreaming={activeStreaming}
             onRetry={(prompt) => sendMessage(prompt)}

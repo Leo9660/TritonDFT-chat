@@ -40,7 +40,10 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
   const [dos, setDos] = useState<DosData | null>(null);
   const [phonons, setPhonons] = useState<BandData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(true);
+  // Collapsed by default. It used to open itself and then scroll into view,
+  // which meant switching to any conversation landed you on its last run's
+  // artifacts instead of at the bottom of the conversation.
+  const [open, setOpen] = useState(false);
 
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [fileText, setFileText] = useState<string>("");
@@ -96,16 +99,6 @@ export function ResultsPanel({ jobId }: { jobId: string }) {
     };
   }, [jobId]);
 
-  // The panel renders after an async fetch — by then the chat's own
-  // bottom-pin has already fired, so the page doesn't follow. Once content is
-  // in, smoothly bring the panel into view so the user sees the result appear.
-  useEffect(() => {
-    if (loading) return;
-    const id = requestAnimationFrame(() => {
-      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-    });
-    return () => cancelAnimationFrame(id);
-  }, [loading]);
 
   async function viewFile(name: string) {
     if (openFile === name) {

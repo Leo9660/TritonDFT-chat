@@ -8,6 +8,7 @@ import { AgentRunBlock } from "./AgentRunBlock";
 import { ResultsPanel } from "./ResultsPanel";
 
 interface Props {
+  convId?: string;
   messages: Message[];
   isStreaming: boolean;
   onRetry?: (prompt: string) => void;
@@ -16,9 +17,16 @@ interface Props {
   model?: string;
 }
 
-export function ChatMessages({ messages, isStreaming, onRetry, onRegenerate }: Props) {
+export function ChatMessages({ convId, messages, isStreaming, onRetry, onRegenerate }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  // Opening a conversation starts at its end, unconditionally. The pin below
+  // only fires when you are already near the bottom, which is right while
+  // reading but leaves a freshly-opened conversation sitting at the top.
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [convId]);
 
   useEffect(() => {
     const el = scrollRef.current;
