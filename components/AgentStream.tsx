@@ -34,6 +34,7 @@ interface StepCard {
   tool?: string;
   log: string[];          // raw lines belonging to this step
   failed: boolean;
+  fixups: number;         // rejected-and-regenerated attempts that then succeeded
 }
 
 interface PlanRow {
@@ -46,6 +47,10 @@ const PLAN_RE = /^(\d+\/\d+)\s*·\s*(\S+)\s*\(([^)]*)\)\s*[—-]\s*(.*)$/;
 const STEP_RE = /^Executing step\s+(\d+)\/(\d+)\s*:\s*(.*)$/i;
 const RUNNING_RE = /^Running\s+(\S+\.x)/i;
 const ERROR_RE = /\berror\b|\bfailed\b|Traceback|CRASH/i;
+/* The input validator rejecting a generated file is the system working, not the
+ * run failing: the step is regenerated and re-run. Its rejection banner and the
+ * ERROR <CODE> line under it must not colour the step red. */
+const VALIDATION_RE = /^\[validation\]|^ERROR [A-Z0-9_]+\s*\[|^Restored the .* state/i;
 
 /* Lines that exist for debugging and say nothing a user can act on. */
 const DROP_RE = /^\[?(parser|runner)\]?\s*(cmd:|Output \d+: trimmed)|Parameters ready|Script generated|API call snippet|Querying material information|Generating plan for query|Parsed \d+ steps/i;
@@ -83,15 +88,26 @@ function parse(content: string) {
 
     const s = body.match(STEP_RE);
     if (s) {
-      cur = { index: `${s[1]}/${s[2]}`, title: s[3].trim(), log: [], failed: false };
+      cur = { index: `${s[1]}/${s[2]}`, title: s[3].trim(), log: [], failed: false, fixups: 0 };
       steps.push(cur);
       continue;
     }
 
     if (cur) {
+      if (VALIDATION_RE.test(body)) {
+        if (/^\[validation\]/i.test(body)) cur.fixups += 1;
+        cur.log.push(body);
+        continue;
+      }
       const r = body.match(RUNNING_RE);
-      if (r && !cur.exec) cur.exec = r[1];
-      if (ERROR_RE.test(body)) cur.failed = true;
+      if (r) {
+        if (!cur.exec) cur.exec = r[1];
+        // A fresh invocation means the step got another attempt, so whatever
+        // went wrong before it was recovered from — don't leave the card red.
+        cur.failed = false;
+      } else if (ERROR_RE.test(body)) {
+        cur.failed = true;
+      }
       cur.log.push(body);
     }
   }
@@ -277,7 +293,20 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
               </span>
             }
             subtitle={running ? <BusyLine exec={st.exec} /> : undefined}
-            right={st.exec && <span style={{ ...mono, color: "var(--fg-mute)" }}>{st.exec}</span>}
+            right={
+              <span className="flex items-center gap-2">
+                {st.fixups > 0 && !st.failed && (
+                  <span
+                    title={t("selfCorrectedHint") as string}
+                    style={{ ...mono, fontSize: 10, padding: "1px 5px", borderRadius: 5,
+                             color: "var(--fg-dim)", border: "1px solid var(--border)" }}
+                  >
+                    {t("selfCorrected")} ×{st.fixups}
+                  </span>
+                )}
+                {st.exec && <span style={{ ...mono, color: "var(--fg-mute)" }}>{st.exec}</span>}
+              </span>
+            }
           >
             <pre
               className="mt-1 overflow-x-auto"
