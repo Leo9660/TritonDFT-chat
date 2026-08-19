@@ -8,9 +8,16 @@ import { BandData } from "@/lib/api";
  *
  * When the Fermi energy is known, energies are zero-referenced to it (E − E_F)
  * and the view zooms to ±6 eV — which is what makes it read like a real band
- * diagram. Valence bands (below E_F) and conduction bands (above) are colored
- * differently, the gap between the valence-band max and conduction-band min is
- * shaded, and hovering shows a crosshair with the energy readout.
+ * diagram. Hovering shows a crosshair with the energy readout.
+ *
+ * This component draws what it was given and infers nothing. It used to split
+ * the sampled points at E_F to colour valence vs conduction and to report a
+ * gap, which was wrong twice over: a *.band.gnu file carries no occupations, so
+ * valence and conduction are not recoverable from it at all; and with
+ * occupations='fixed' QE reports E_F *at* the VBM, so the split put the VBM
+ * band on both sides and the gap came out ~0.00 eV for every semiconductor.
+ * The band gap is read from what QE itself printed — see extract_result() —
+ * and belongs in the numbers card, from one source.
  */
 export function BandPlot({ data }: { data: BandData }) {
   const W = 580;
@@ -43,22 +50,8 @@ export function BandPlot({ data }: { data: BandData }) {
   const N_TICKS = 6;
   const ticks = Array.from({ length: N_TICKS + 1 }, (_, i) => yLo + (eRange * i) / N_TICKS);
 
-  // Compute VBM / CBM (referenced) to shade the gap, when Fermi-aligned.
-  let vbm: number | null = null;
-  let cbm: number | null = null;
-  if (hasFermi) {
-    for (const band of data.bands) {
-      for (const [, e] of band) {
-        const r = e - shift;
-        if (r <= 0.0001) vbm = vbm == null ? r : Math.max(vbm, r);
-        else cbm = cbm == null ? r : Math.min(cbm, r);
-      }
-    }
-  }
-  const gap = vbm != null && cbm != null && cbm > vbm ? cbm - vbm : null;
 
-  const VALENCE = "#4577ff";
-  const CONDUCT = "#22d3a5";
+  const BAND = "#4577ff";
 
   function onMove(e: React.MouseEvent<SVGSVGElement>) {
     const svg = svgRef.current;
@@ -87,10 +80,6 @@ export function BandPlot({ data }: { data: BandData }) {
           <clipPath id="band-clip">
             <rect x={pad.l} y={pad.t} width={plotW} height={plotH} />
           </clipPath>
-          <linearGradient id="gap-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={CONDUCT} stopOpacity={0.1} />
-            <stop offset="100%" stopColor={VALENCE} stopOpacity={0.1} />
-          </linearGradient>
         </defs>
 
         <rect
@@ -102,18 +91,6 @@ export function BandPlot({ data }: { data: BandData }) {
           stroke="var(--border)"
         />
 
-        {/* shaded band gap */}
-        {gap != null && (
-          <g clipPath="url(#band-clip)">
-            <rect
-              x={pad.l}
-              y={y(cbm! + shift)}
-              width={plotW}
-              height={Math.max(0, y(vbm! + shift) - y(cbm! + shift))}
-              fill="url(#gap-fill)"
-            />
-          </g>
-        )}
 
         {/* y grid + tick labels */}
         {ticks.map((ev, i) => (
@@ -140,20 +117,14 @@ export function BandPlot({ data }: { data: BandData }) {
           </g>
         ))}
 
-        {/* bands (valence vs conduction) + Fermi line, clipped to the plot */}
+        {/* bands + Fermi line, clipped to the plot */}
         <g clipPath="url(#band-clip)">
           {data.bands.map((band, i) => {
-            // Color a band by whether its midpoint sits below/above E_F.
-            let stroke = VALENCE;
-            if (hasFermi) {
-              const mid = band[Math.floor(band.length / 2)]?.[1] ?? 0;
-              stroke = mid - shift > 0 ? CONDUCT : VALENCE;
-            }
             return (
               <polyline
                 key={i}
                 fill="none"
-                stroke={stroke}
+                stroke={BAND}
                 strokeWidth={1.4}
                 opacity={0.85}
                 points={band.map(([k, e]) => `${x(k)},${y(e)}`).join(" ")}
@@ -251,29 +222,10 @@ export function BandPlot({ data }: { data: BandData }) {
         }}
       >
         <span>{data.n_bands} bands</span>
-        {hasFermi && (
-          <>
-            <Legend color={VALENCE} label="valence" />
-            <Legend color={CONDUCT} label="conduction" />
-            <span style={{ color: "var(--amber-500,#f59e0b)" }}>┄ E_F</span>
-          </>
-        )}
-        {gap != null && (
-          <span style={{ color: "var(--fg-mute)", fontWeight: 600 }}>gap ≈ {gap.toFixed(2)} eV</span>
-        )}
+        {hasFermi && <span style={{ color: "var(--amber-500,#f59e0b)" }}>┄ E_F</span>}
         <span style={{ marginLeft: "auto", opacity: 0.8 }}>hover to read energy</span>
       </div>
     </div>
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-      <span
-        style={{ width: 14, height: 2.5, background: color, borderRadius: 2, display: "inline-block" }}
-      />
-      {label}
-    </span>
-  );
-}
