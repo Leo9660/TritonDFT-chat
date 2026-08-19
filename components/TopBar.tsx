@@ -38,7 +38,7 @@ export function TopBar({
       className="relative z-50 flex items-center justify-between px-4 py-2 border-b backdrop-blur-md"
       style={{
         borderColor: "var(--border)",
-        background: "rgba(7, 8, 13, 0.55)",
+        background: "var(--bg-glass)",
       }}
     >
       <div className="flex items-center gap-2.5">

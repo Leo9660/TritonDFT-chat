@@ -78,7 +78,7 @@ export function ChatMenu({ hasConversation, panelOpen, onTogglePanel, onExport, 
             <>
               <Divider />
               <MenuItem
-                icon={copied ? <CheckIcon size={14} style={{ color: "#10b981" }} /> : <ClipboardIcon size={14} />}
+                icon={copied ? <CheckIcon size={14} style={{ color: "var(--green-500)" }} /> : <ClipboardIcon size={14} />}
                 label={copied ? t("copied") : t("copyAsMarkdown")}
                 onClick={handleCopy}
               />

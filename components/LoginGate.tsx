@@ -42,7 +42,7 @@ export function LoginGate() {
         inset: 0,
         display: "grid",
         placeItems: "center",
-        background: "rgba(7, 8, 13, 0.72)",
+        background: "var(--bg-glass)",
         backdropFilter: "blur(12px)",
         zIndex: 100,
         padding: 24,

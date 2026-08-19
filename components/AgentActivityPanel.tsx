@@ -380,7 +380,7 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
   let StatusIcon = CheckIcon as typeof CheckIcon;
   if (isStreaming) {
     statusText = `${t("running")}…`;
-    statusColor = "#10b981";
+    statusColor = "var(--green-500)";
     StatusIcon = Loader2Icon;
   } else if (hasError) {
     statusText = `${t("failed")} ${t("stepN")} ${erroredPhaseIdx + 1}`;
@@ -493,7 +493,7 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
                         {p.hasError ? (
                           <AlertTriangleIcon size={13} style={{ color: "#ef4444" }} />
                         ) : isLastInLatest ? (
-                          <Loader2Icon size={13} className="spin-slow" style={{ color: "#10b981" }} />
+                          <Loader2Icon size={13} className="spin-slow" style={{ color: "var(--green-500)" }} />
                         ) : (
                           <CheckIcon size={13} style={{ color: "#4577ff" }} />
                         )}

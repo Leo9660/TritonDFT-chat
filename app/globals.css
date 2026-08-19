@@ -47,6 +47,7 @@
   --shadow-panel: 0 6px 18px rgba(40, 35, 25, 0.07);
   --shadow-modal: 0 20px 60px rgba(40, 35, 25, 0.18);
   --scrim: rgba(40, 35, 25, 0.32);
+  --bg-glass: rgba(251, 250, 248, 0.72);   /* translucent bars over the page */
 
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-serif: "Instrument Serif", "Georgia", serif;
@@ -95,6 +96,7 @@
   --shadow-panel: 0 8px 22px rgba(0, 0, 0, 0.3);
   --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.55);
   --scrim: rgba(5, 6, 9, 0.62);
+  --bg-glass: rgba(11, 12, 17, 0.62);
 }
 
 html, body {
@@ -235,7 +237,7 @@ button:not(:disabled),
   background: var(--blue-500);
 }
 .agent-run-status.is-live .agent-run-status-dot {
-  background: #10b981;
+  background: var(--green-500);
   box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18);
   animation: pulse-live 1.4s ease-in-out infinite;
 }
