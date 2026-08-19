@@ -181,44 +181,54 @@ const BUSY: [RegExp, string][] = [
   [/ev\.x/i,      "Fitting the equation of state…"],
 ];
 
-/* Occasional stand-ins, so a long run is not the same sentence forever. */
+/* Stand-ins shown between the step's own line. */
 const ASIDES = [
-  "Consulting Kohn and Sham…",
-  "Negotiating with the exchange-correlation functional…",
-  "Asking Bloch to confirm the periodicity…",
-  "Checking that Hohenberg and Kohn still stand by their theorem…",
-  "Filling the Brillouin zone, one k-point at a time…",
-  "Asking the pseudopotential what it hid in the core…",
-  "Making sure nobody moved the Fermi level…",
+  "Consulting Kohn and Sham\u2026",
+  "Revisiting Hohenberg and Kohn\u2019s theorem\u2026",
+  "Negotiating with the exchange-correlation functional\u2026",
+  "Trusting the variational principle\u2026",
+  "Keeping an eye on the total energy\u2026",
+  "Making peace with the Born\u2013Oppenheimer approximation\u2026",
+  "Letting quantum mechanics do the paperwork\u2026",
+  "Making sure the wavefunctions behave themselves\u2026",
 ];
 
-/** The line under a running step, cycling between what the step is actually
- *  doing and an aside, so a long wait is not one frozen sentence.
+/** The line under a running step. It alternates between what the step is
+ *  actually doing and a randomly drawn aside, so the physics stays the thing
+ *  being said and the asides do not march in a predictable order.
  *
- *  The step-specific line always comes first and every other slot, so the
- *  physics stays the thing being said and the jokes are the garnish. */
+ *  The first frame is always the step's own line and never random: a random
+ *  first render would differ between the server and client markup. */
 function BusyLine({ exec }: { exec?: string }) {
-  const lines = useMemo(() => {
+  const real = useMemo(() => {
     const hit = BUSY.find(([re]) => re.test(exec || ""));
-    const real = hit ? hit[1] : "Working\u2026";
-    return ASIDES.flatMap((aside) => [real, aside]);
+    return hit ? hit[1] : "Working\u2026";
   }, [exec]);
 
-  const [i, setI] = useState(0);
+  const [{ tick, aside }, setState] = useState({ tick: 0, aside: ASIDES[0] });
+
   useEffect(() => {
     // Long enough to read the sentence twice without it feeling restless;
     // short enough that a multi-minute SCF still visibly changes.
-    const id = setInterval(() => setI((n) => n + 1), 10000);
+    const id = setInterval(() => {
+      setState((s) => {
+        // Draw the next aside as we leave the step line, and never draw the one
+        // just shown — a repeat reads as the animation having frozen.
+        if (s.tick % 2 !== 0) return { ...s, tick: s.tick + 1 };
+        const pool = ASIDES.filter((a) => a !== s.aside);
+        return { tick: s.tick + 1, aside: pool[Math.floor(Math.random() * pool.length)] };
+      });
+    }, 10000);
     return () => clearInterval(id);
   }, []);
 
   return (
     <span
-      key={i}
+      key={tick}
       className="busy-line"
       style={{ display: "block", marginTop: 2, fontSize: 11.5, color: "var(--fg-dim)" }}
     >
-      {lines[i % lines.length]}
+      {tick % 2 === 0 ? real : aside}
     </span>
   );
 }
