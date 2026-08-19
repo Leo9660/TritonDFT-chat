@@ -84,11 +84,11 @@ export function runJob(
   let stopped = false;
   let jobId: string | null = null;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
-  let typeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Typewriter state
+  // Output is emitted whole. A character-by-character reveal made a 60-line
+  // agent log crawl for minutes after the run had already finished, and it
+  // fights the reader: the interesting part is usually the last line.
   let target = "";                                  // full output from latest poll
-  let displayed = 0;                                // chars revealed so far
   let phase: "queued" | "running" | "terminal" = "queued";
   let lastSent: string | null = null;
   let lastPendingKey: string | null = null;         // dedupe onApproval fires
@@ -108,38 +108,18 @@ export function runJob(
     }
   }
 
-  // Jittered inter-keystroke delay — mostly fast, with the occasional
-  // human-like pause.
-  function nextDelay(): number {
-    const r = Math.random();
-    if (r < 0.05) return 90 + Math.random() * 150;   // occasional "thinking" pause
-    return 11 + Math.random() * 36;                  // normal jittery typing
-  }
-
-  function typeTick() {
+  function flush() {
     if (stopped) return;
-    if (displayed < target.length) {
-      const remaining = target.length - displayed;
-      // Big backlog → reveal in chunks so we track the 1.5s poll cadence;
-      // near the end → 1–2 chars at a time for a genuine typing feel.
-      const step =
-        remaining > 220 ? Math.ceil(remaining / 55) : 1 + Math.floor(Math.random() * 2);
-      displayed = Math.min(target.length, displayed + step);
-      emit(target.slice(0, displayed));
-      typeTimer = setTimeout(typeTick, nextDelay());
-    } else if (phase === "terminal") {
-      typeTimer = null;
-      cb.onDone(jobId);
+    if (target.length === 0 && phase === "running") {
+      emit("");
     } else {
-      // Caught up but job still running — show a placeholder if nothing has
-      // streamed yet, then idle-poll for more.
-      if (phase === "running" && target.length === 0) emit("⏳ Running…");
-      typeTimer = setTimeout(typeTick, 60);
+      emit(target);
     }
+    if (phase === "terminal") cb.onDone(jobId);
   }
 
   function ensureTyping() {
-    if (typeTimer === null && !stopped) typeTick();
+    flush();
   }
 
   async function poll() {
@@ -252,7 +232,7 @@ export function runJob(
       if (stopped) return;
       stopped = true;
       if (pollTimer) clearTimeout(pollTimer);
-      if (typeTimer) clearTimeout(typeTimer);
+
       if (jobId) {
         fetch(`${base}/jobs/${jobId}/cancel`, {
           method: "POST",

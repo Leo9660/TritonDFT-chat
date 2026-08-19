@@ -663,6 +663,8 @@ export default function Page() {
             isStreaming={activeStreaming}
             onRetry={(prompt) => sendMessage(prompt)}
             onRegenerate={(prompt) => regenerate(prompt)}
+            pseudo={pseudo}
+            model={model}
           />
         )}
         <div className="px-4 py-3 max-w-3xl w-full mx-auto">

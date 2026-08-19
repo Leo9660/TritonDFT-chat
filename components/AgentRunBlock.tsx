@@ -4,11 +4,14 @@ import { useMemo } from "react";
 import { RotateCwIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AgentStream } from "./AgentStream";
+import { PseudoChoice } from "@/lib/types";
 
 interface Props {
   content: string;
   isStreaming: boolean;
   onRetry?: () => void;
+  pseudo?: PseudoChoice;
+  model?: string;
 }
 
 /**
@@ -24,7 +27,7 @@ interface Props {
  * State pill becomes red ("Failed at step N") when the body contains an
  * [ERROR]-class tag. Footer shows a Retry button on failure.
  */
-export function AgentRunBlock({ content, isStreaming, onRetry }: Props) {
+export function AgentRunBlock({ content, isStreaming, onRetry, pseudo, model }: Props) {
   const { t } = useTranslation();
   const { stepCount, errorAt } = useMemo(() => parseAgentState(content), [content]);
 
@@ -82,7 +85,7 @@ export function AgentRunBlock({ content, isStreaming, onRetry }: Props) {
           </div>
         ) : (
           <>
-            <AgentStream content={content} />
+            <AgentStream content={content} isStreaming={isStreaming} pseudo={pseudo} model={model} />
             {isStreaming && <span className="streaming-cursor" aria-hidden="true" />}
           </>
         )}

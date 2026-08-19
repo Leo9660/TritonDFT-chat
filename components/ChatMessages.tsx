@@ -12,6 +12,8 @@ interface Props {
   isStreaming: boolean;
   onRetry?: (prompt: string) => void;
   onRegenerate?: (prompt: string) => void;
+  pseudo?: import("@/lib/types").PseudoChoice;
+  model?: string;
 }
 
 export function ChatMessages({ messages, isStreaming, onRetry, onRegenerate }: Props) {
@@ -74,6 +76,8 @@ function MessageBubbleImpl({
   retryPrompt,
   onRetry,
   onRegenerate,
+  pseudo,
+  model,
 }: {
   message: Message;
   isLast: boolean;
@@ -81,6 +85,8 @@ function MessageBubbleImpl({
   retryPrompt?: string;
   onRetry?: (prompt: string) => void;
   onRegenerate?: (prompt: string) => void;
+  pseudo?: import("@/lib/types").PseudoChoice;
+  model?: string;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -130,7 +136,7 @@ function MessageBubbleImpl({
 
   return (
     <div className="self-start w-full max-w-full group anim-slide-in">
-      <AgentRunBlock content={message.content} isStreaming={isStreaming} onRetry={handleRetry} />
+      <AgentRunBlock content={message.content} isStreaming={isStreaming} onRetry={handleRetry} pseudo={pseudo} model={model} />
       {message.jobId && !isStreaming && <ResultsPanel jobId={message.jobId} />}
       {!isStreaming && message.content.length > 0 && (
         <div className="mt-1.5 ml-2 inline-flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">

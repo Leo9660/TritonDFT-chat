@@ -1,240 +1,234 @@
 "use client";
 
-/**
- * Renders an agent's `[Tag] body` stream as clean step rows instead of raw log.
- *
- * Parse rules:
- *  - A line matching `^\[tag\] body` starts a new Step (body may be empty).
- *  - A non-tagged line that follows a Step is appended to that step's body
- *    (e.g. multi-line code snippets the agent prints after a tag line).
- *  - A non-tagged line with NO preceding step (or starting with `>` blockquote
- *    markers we inject) becomes part of a Markdown block, rendered as
- *    regular markdown.
- */
-
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  AlertTriangleIcon,
-  AtomIcon,
-  DatabaseIcon,
-  SparklesIcon,
-  CpuIcon,
-  FlaskConicalIcon,
-  TerminalIcon,
-  ChevronRightIcon,
-  PlayIcon,
+  ChevronRightIcon, AlertTriangleIcon, CheckIcon, Loader2Icon,
+  SlidersHorizontalIcon, DatabaseIcon, ListChecksIcon,
 } from "lucide-react";
-import { MessageRenderer } from "./MessageRenderer";
+import { PseudoChoice } from "@/lib/types";
+
+/**
+ * Renders an agent run as a small number of cards instead of a log.
+ *
+ * The backend prints a lot that is only useful for debugging — parser trimming
+ * counts, parameter-blob acknowledgements, raw mpirun invocations. None of that
+ * tells a user anything they can act on, so the parser here is an allowlist: it
+ * looks for the four things worth showing (settings, the material, the plan, and
+ * one card per step) and drops the rest. Anything unrecognised stays available
+ * inside the step it belongs to, so nothing is truly lost.
+ */
 
 interface Props {
   content: string;
+  isStreaming?: boolean;
+  pseudo?: PseudoChoice;
+  model?: string;
 }
 
-interface PlanLine {
-  index: string;   // "1/4"
-  tool: string;    // "pw_vc_relax"
-  binary: string;  // "pw.x · vc-relax"
+interface StepCard {
+  index: string;          // "3/6"
+  title: string;
+  exec?: string;          // pw.x · nscf, from the plan
+  tool?: string;
+  log: string[];          // raw lines belonging to this step
+  failed: boolean;
+}
+
+interface PlanRow {
+  index: string;
+  binary: string;
   problem: string;
-  unknown: boolean;
 }
 
-type Block =
-  | { kind: "step"; tag: string; body: string; isError: boolean; key: number }
-  | { kind: "plan"; lines: PlanLine[]; key: number }
-  | { kind: "markdown"; text: string; key: number };
+const PLAN_RE = /^(\d+\/\d+)\s*·\s*(\S+)\s*\(([^)]*)\)\s*[—-]\s*(.*)$/;
+const STEP_RE = /^Executing step\s+(\d+)\/(\d+)\s*:\s*(.*)$/i;
+const RUNNING_RE = /^Running\s+(\S+\.x)/i;
+const ERROR_RE = /\berror\b|\bfailed\b|Traceback|CRASH/i;
 
-/* The backend emits one line per planned step:
- *   [plan] 2/4 · pw_scf (pw.x · scf) — Converge the charge density
- * Anything that doesn't match (e.g. "Parsed 4 steps.") stays a plain step row. */
-const PLAN_LINE_RE = /^(\d+\/\d+)\s*·\s*(\S+)\s*\(([^)]*)\)\s*[—-]\s*(.*)$/;
+/* Lines that exist for debugging and say nothing a user can act on. */
+const DROP_RE = /^\[?(parser|runner)\]?\s*(cmd:|Output \d+: trimmed)|Parameters ready|Script generated|API call snippet|Querying material information|Generating plan for query|Parsed \d+ steps/i;
 
-function parsePlanLine(body: string): PlanLine | null {
-  const m = body.trim().match(PLAN_LINE_RE);
-  if (!m) return null;
-  const problem = m[4].replace(/\s*\[unknown tool\]\s*$/, "");
-  return {
-    index: m[1],
-    tool: m[2],
-    binary: m[3],
-    problem,
-    unknown: /\[unknown tool\]/.test(m[4]),
-  };
-}
+function parse(content: string) {
+  const material: string[] = [];
+  const plan: PlanRow[] = [];
+  const steps: StepCard[] = [];
+  let cur: StepCard | null = null;
 
-/* Fold consecutive [plan] step-lines into one card, so the plan reads as a
- * single highlighted block instead of N repeated "Plan" rows. */
-function coalescePlan(blocks: Block[]): Block[] {
-  const out: Block[] = [];
-  for (const b of blocks) {
-    const line = b.kind === "step" && b.tag.toLowerCase() === "plan" ? parsePlanLine(b.body) : null;
-    if (!line) {
-      out.push(b);
+  for (const raw of content.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    const m = line.match(/^\[([\w-]+)\]\s*(.*)$/);
+    const tag = m ? m[1].toLowerCase() : "";
+    const body = m ? m[2] : line;
+
+    if (DROP_RE.test(body) || DROP_RE.test(line)) continue;
+
+    if (tag === "mp") { material.push(body); continue; }
+
+    if (tag === "plan") {
+      const p = body.match(PLAN_RE);
+      if (p) plan.push({ index: p[1], binary: p[3], problem: p[4].replace(/\s*\[unknown tool\]$/, "") });
       continue;
     }
-    const prev = out[out.length - 1];
-    if (prev && prev.kind === "plan") {
-      prev.lines.push(line);
-    } else {
-      out.push({ kind: "plan", lines: [line], key: b.key });
+
+    const s = body.match(STEP_RE);
+    if (s) {
+      cur = { index: `${s[1]}/${s[2]}`, title: s[3].trim(), log: [], failed: false };
+      steps.push(cur);
+      continue;
+    }
+
+    if (cur) {
+      const r = body.match(RUNNING_RE);
+      if (r && !cur.exec) cur.exec = r[1];
+      if (ERROR_RE.test(body)) cur.failed = true;
+      cur.log.push(body);
     }
   }
-  return out;
+
+  // The plan knows each step's binary; prefer it over scraping the runner line.
+  steps.forEach((st) => {
+    const row = plan.find((p) => p.index === st.index);
+    if (row) st.exec = row.binary;
+  });
+
+  return { material, plan, steps };
 }
 
-const ERROR_TAGS = new Set(["error", "exception", "fatal"]);
-
-function tagColor(tag: string, isError: boolean): string {
-  if (isError) return "#ef4444";
-  const t = tag.toLowerCase();
-  if (t === "warn" || t === "warning") return "#fbbf24";
-  if (t === "planner" || t === "plan") return "#7c9eff";
-  if (t === "executor" || t === "solve_sub_problem" || t === "solve") return "#fbbf24";
-  if (t === "analyzer") return "#34d399";
-  if (t === "refiner") return "#a78bfa";
-  if (t === "dftagent") return "#c9d8ff";
-  if (t === "run") return "#9fa5b9";
-  if (t === "info_query" || t === "info-query") return "#67e8f9";
-  return "#9fa5b9";
-}
-
-function tagIcon(tag: string, isError: boolean) {
-  if (isError) return AlertTriangleIcon;
-  const t = tag.toLowerCase();
-  if (t === "dftagent") return AtomIcon;
-  if (t === "info_query" || t === "info-query") return DatabaseIcon;
-  if (t === "planner" || t === "plan") return SparklesIcon;
-  if (t === "executor" || t === "solve_sub_problem" || t === "solve") return CpuIcon;
-  if (t === "analyzer") return FlaskConicalIcon;
-  if (t === "refiner") return SparklesIcon;
-  if (t === "run") return PlayIcon;
-  return TerminalIcon;
-}
-
-function prettyTag(raw: string, isError: boolean): string {
-  // Convert `solve_sub_problem` → "Solve sub-problem", `info_query` → "Info query".
-  const t = raw.replace(/_/g, " ").replace(/-/g, " ");
-  const cap = t.charAt(0).toUpperCase() + t.slice(1);
-  return isError ? `${cap} · error` : cap;
-}
-
-function parseBlocks(content: string): Block[] {
-  const lines = content.split("\n");
-  const out: Block[] = [];
-  let curStep: Extract<Block, { kind: "step" }> | null = null;
-  let mdBuf: string[] = [];
-  let key = 0;
-
-  const flushMd = () => {
-    if (mdBuf.length === 0) return;
-    const text = mdBuf.join("\n").trim();
-    mdBuf = [];
-    if (text) out.push({ kind: "markdown", text, key: key++ });
-  };
-
-  const flushStep = () => {
-    if (curStep) {
-      curStep.body = curStep.body.trimEnd();
-      out.push(curStep);
-      curStep = null;
-    }
-  };
-
-  // `[tag][subtag] body` or `[tag] body`. We treat any `[…error…]` segment as an error step.
-  const tagRe = /^\[([\w-]+)\](?:\[([\w-]+)\])?\s*(.*)$/;
-
-  for (const rawLine of lines) {
-    const line = rawLine.replace(/\r$/, "");
-    const m = line.match(tagRe);
-    if (m) {
-      // New step. Flush whatever we were accumulating.
-      flushMd();
-      flushStep();
-      const t1 = m[1].toLowerCase();
-      const t2 = (m[2] || "").toLowerCase();
-      const isError = ERROR_TAGS.has(t1) || ERROR_TAGS.has(t2) || t2 === "error";
-      curStep = {
-        kind: "step",
-        tag: m[1],
-        body: m[3] || "",
-        isError,
-        key: key++,
-      };
-    } else if (curStep) {
-      // Continuation of current step's body.
-      curStep.body += (curStep.body ? "\n" : "") + line;
-    } else {
-      // No preceding step — collect as markdown.
-      mdBuf.push(line);
-    }
-  }
-  flushStep();
-  flushMd();
-  return coalescePlan(out);
-}
-
-function PlanCard({ lines }: { lines: PlanLine[] }) {
-  const { t } = useTranslation();
+function Card({
+  icon, title, right, children, tone = "plain", defaultOpen = false, collapsible = true,
+}: {
+  icon: React.ReactNode; title: React.ReactNode; right?: React.ReactNode;
+  children?: React.ReactNode; tone?: "plain" | "accent" | "error"; defaultOpen?: boolean;
+  collapsible?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const border =
+    tone === "error" ? "rgba(220, 80, 70, 0.35)"
+    : tone === "accent" ? "var(--border-strong)"
+    : "var(--border)";
   return (
-    <div className="agent-plan-card">
-      <div className="agent-plan-head">
-        <SparklesIcon size={13} />
-        <span className="agent-plan-title">{t("planTitle", { defaultValue: "Plan" })}</span>
-        <span className="agent-plan-count">
-          {t("stepCount", { count: lines.length, defaultValue: `${lines.length} steps` })}
-        </span>
-      </div>
-      <ol className="agent-plan-list">
-        {lines.map((l, i) => (
-          <li key={i} className={`agent-plan-step ${l.unknown ? "is-unknown" : ""}`} title={l.tool}>
-            <span className="agent-plan-idx">{l.index}</span>
-            {/* Only the executable + the subproblem's own description. The
-                logical tool name (pw_vc_relax, bands_post, …) is redundant with
-                the executable + mode, so it moves to the hover title. */}
-            <span className="agent-plan-bin">{l.binary || l.tool}</span>
-            <span className="agent-plan-problem">{l.problem}</span>
-          </li>
-        ))}
-      </ol>
+    <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${border}`, background: "var(--bg-1)" }}>
+      <button
+        type="button"
+        onClick={() => collapsible && setOpen((o) => !o)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left"
+        style={{ cursor: collapsible ? "pointer" : "default" }}
+      >
+        {collapsible ? (
+          <ChevronRightIcon size={12} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", opacity: 0.55 }} />
+        ) : <span style={{ width: 12 }} />}
+        {icon}
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg)" }}>{title}</span>
+        <span style={{ flex: 1 }} />
+        {right}
+      </button>
+      {open && children && <div className="px-3 pb-3">{children}</div>}
     </div>
   );
 }
 
-export function AgentStream({ content }: Props) {
-  const blocks = useMemo(() => parseBlocks(content), [content]);
+const mono = { fontFamily: "var(--font-mono)", fontSize: 11 } as const;
+
+export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
+  const { t } = useTranslation();
+  const { material, plan, steps } = useMemo(() => parse(content), [content]);
 
   return (
-    <div className="agent-stream">
-      {blocks.map((b) => {
-        if (b.kind === "plan") {
-          return <PlanCard key={b.key} lines={b.lines} />;
-        }
-        if (b.kind === "markdown") {
-          return (
-            <div key={b.key} className="agent-stream-md">
-              <MessageRenderer content={b.text} />
-            </div>
-          );
-        }
-        const Icon = tagIcon(b.tag, b.isError);
-        const color = tagColor(b.tag, b.isError);
-        return (
-          <div key={b.key} className={`agent-step ${b.isError ? "is-error" : ""}`}>
-            <div className="agent-step-bullet" style={{ color }}>
-              <Icon size={13} />
-            </div>
-            <div className="agent-step-main">
-              <div className="agent-step-tag" style={{ color }}>
-                <ChevronRightIcon size={10} style={{ opacity: 0.6 }} />
-                {prettyTag(b.tag, b.isError)}
-              </div>
-              {b.body && (
-                <div className="agent-step-body">{b.body}</div>
-              )}
-            </div>
+    <div className="flex flex-col gap-2">
+      {/* 1. What this run was configured with — first, before anything happens. */}
+      {(pseudo || model) && (
+        <Card
+          collapsible={false}
+          icon={<SlidersHorizontalIcon size={13} style={{ color: "var(--blue-500)" }} />}
+          title={t("runSettings")}
+          right={
+            <span style={{ ...mono, color: "var(--fg-mute)" }}>
+              {model}
+              {pseudo ? ` · ${pseudo.xc} · ${pseudo.relativistic} · ${pseudo.accuracy}` : ""}
+            </span>
+          }
+        />
+      )}
+
+      {/* 2. The material, as one card once the lookup has resolved. */}
+      {material.length > 0 && (
+        <Card
+          collapsible={material.length > 1}
+          icon={<DatabaseIcon size={13} style={{ color: "var(--blue-500)" }} />}
+          title={t("material")}
+          right={<span style={{ ...mono, color: "var(--fg-mute)" }}>{material[0]}</span>}
+        >
+          <div className="mt-1" style={{ ...mono, color: "var(--fg-mute)", lineHeight: 1.6 }}>
+            {material.slice(1).map((l, i) => <div key={i}>{l}</div>)}
           </div>
+        </Card>
+      )}
+      {/* 3. The plan. */}
+      {plan.length > 0 && (
+        <Card
+          collapsible={false}
+          icon={<ListChecksIcon size={13} style={{ color: "var(--blue-500)" }} />}
+          title={t("planTitle")}
+          right={<span style={{ ...mono, color: "var(--fg-dim)" }}>{plan.length} {t("stepsWord")}</span>}
+        >
+          <ol className="flex flex-col gap-1 mt-1">
+            {plan.map((p) => (
+              <li key={p.index} className="flex items-baseline gap-2" style={{ fontSize: 12 }}>
+                <span style={{ ...mono, color: "var(--blue-500)" }}>{p.index}</span>
+                <span style={{ ...mono, color: "var(--fg-mute)", whiteSpace: "nowrap" }}>{p.binary}</span>
+                <span style={{ color: "var(--fg-mute)" }}>{p.problem}</span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
+
+      {/* 4. One card per step; the log lives inside it. */}
+      {steps.map((st, i) => {
+        const isLast = i === steps.length - 1;
+        const running = !!isStreaming && isLast && !st.failed;
+        return (
+          <Card
+            key={st.index + i}
+            tone={st.failed ? "error" : "plain"}
+            icon={
+              st.failed ? <AlertTriangleIcon size={13} style={{ color: "#c0453c" }} />
+              : running ? <Loader2Icon size={13} className="spin-slow" style={{ color: "var(--green-500)" }} />
+              : <CheckIcon size={13} style={{ color: "var(--blue-500)" }} />
+            }
+            title={
+              <span>
+                <span style={{ ...mono, color: "var(--blue-500)", marginRight: 6 }}>{st.index}</span>
+                {st.title}
+              </span>
+            }
+            right={
+              <span className="flex items-center gap-2">
+                {st.exec && <span style={{ ...mono, color: "var(--fg-mute)" }}>{st.exec}</span>}
+                {running && <span style={{ fontSize: 11, color: "var(--fg-dim)" }}>{t("computing")}</span>}
+              </span>
+            }
+          >
+            <pre
+              className="mt-1 overflow-x-auto"
+              style={{
+                ...mono, lineHeight: 1.5, color: "var(--fg-mute)", whiteSpace: "pre-wrap",
+                background: "var(--bg-0)", border: "1px solid var(--border)",
+                borderRadius: 8, padding: "8px 10px", maxHeight: 320, overflowY: "auto",
+              }}
+            >
+              {st.log.join("\n") || t("noOutputYet")}
+            </pre>
+          </Card>
         );
       })}
+
+      {steps.length === 0 && plan.length === 0 && material.length === 0 && content.trim() && (
+        <div style={{ ...mono, color: "var(--fg-dim)" }}>{content.trim().slice(0, 400)}</div>
+      )}
     </div>
   );
 }
