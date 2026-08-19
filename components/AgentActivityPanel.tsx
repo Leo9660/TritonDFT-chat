@@ -7,7 +7,6 @@ import {
   ActivityIcon,
   XIcon,
   CheckIcon,
-  Loader2Icon,
   AtomIcon,
   DatabaseIcon,
   CpuIcon,
@@ -18,6 +17,7 @@ import {
   PlayIcon,
   ListChecksIcon,
 } from "lucide-react";
+import { AtomSpinner } from "./AtomSpinner";
 import { Conversation } from "@/lib/types";
 
 interface Props {
@@ -377,11 +377,11 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
 
   let statusText: string;
   let statusColor: string;
-  let StatusIcon = CheckIcon as typeof CheckIcon;
+  let StatusIcon: React.ComponentType<{ size?: number; className?: string }> = CheckIcon;
   if (isStreaming) {
     statusText = `${t("running")}…`;
     statusColor = "var(--green-500)";
-    StatusIcon = Loader2Icon;
+    StatusIcon = AtomSpinner;
   } else if (hasError) {
     statusText = `${t("failed")} ${t("stepN")} ${erroredPhaseIdx + 1}`;
     statusColor = "#ef4444";
@@ -426,7 +426,7 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
             border: `1px solid ${statusColor}40`,
           }}
         >
-          <StatusIcon size={11} className={isStreaming ? "spin-slow" : ""} />
+          <StatusIcon size={12} />
           {statusText}
         </span>
         {!isHistorical && phases.length > 0 && (
@@ -493,7 +493,7 @@ export function AgentActivityPanel({ conversation, isStreaming, onClose }: Props
                         {p.hasError ? (
                           <AlertTriangleIcon size={13} style={{ color: "#ef4444" }} />
                         ) : isLastInLatest ? (
-                          <Loader2Icon size={13} className="spin-slow" style={{ color: "var(--green-500)" }} />
+                          <span style={{ color: "var(--green-500)" }}><AtomSpinner size={14} /></span>
                         ) : (
                           <CheckIcon size={13} style={{ color: "#4577ff" }} />
                         )}

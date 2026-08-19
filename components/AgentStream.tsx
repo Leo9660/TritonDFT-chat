@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ChevronRightIcon, AlertTriangleIcon, CheckIcon, Loader2Icon,
+  ChevronRightIcon, AlertTriangleIcon, CheckIcon,
   SlidersHorizontalIcon, DatabaseIcon, ListChecksIcon,
 } from "lucide-react";
 import { PseudoChoice } from "@/lib/types";
+import { AtomSpinner } from "./AtomSpinner";
 
 /**
  * Renders an agent run as a small number of cards instead of a log.
@@ -159,12 +160,35 @@ const ASIDES = [
   "Asking Bloch to confirm the periodicity…",
 ];
 
-/** Deterministic in the step index: it must not reshuffle on every re-render,
- *  and a random pick would also differ between server and client markup. */
-function busyLine(exec: string | undefined, stepIndex: number): string {
-  if (stepIndex > 0 && stepIndex % 4 === 3) return ASIDES[(stepIndex / 4) | 0 % ASIDES.length];
-  const hit = BUSY.find(([re]) => re.test(exec || ""));
-  return hit ? hit[1] : "Working…";
+/** The line under a running step, cycling between what the step is actually
+ *  doing and an aside, so a long wait is not one frozen sentence.
+ *
+ *  The step-specific line always comes first and every other slot, so the
+ *  physics stays the thing being said and the jokes are the garnish. */
+function BusyLine({ exec }: { exec?: string }) {
+  const lines = useMemo(() => {
+    const hit = BUSY.find(([re]) => re.test(exec || ""));
+    const real = hit ? hit[1] : "Working\u2026";
+    return ASIDES.flatMap((aside) => [real, aside]);
+  }, [exec]);
+
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    // Long enough to read the sentence, short enough that a multi-minute SCF
+    // still visibly changes.
+    const id = setInterval(() => setI((n) => n + 1), 6000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <span
+      key={i}
+      className="busy-line"
+      style={{ fontSize: 11, color: "var(--fg-dim)" }}
+    >
+      {lines[i % lines.length]}
+    </span>
+  );
 }
 
 export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
@@ -231,7 +255,7 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
             tone={st.failed ? "error" : "plain"}
             icon={
               st.failed ? <AlertTriangleIcon size={13} style={{ color: "#c0453c" }} />
-              : running ? <Loader2Icon size={13} className="spin-slow" style={{ color: "var(--green-500)" }} />
+              : running ? <span style={{ color: "var(--green-500)" }}><AtomSpinner size={14} /></span>
               : <CheckIcon size={13} style={{ color: "var(--blue-500)" }} />
             }
             title={
@@ -243,9 +267,7 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
             right={
               <span className="flex items-center gap-2">
                 {st.exec && <span style={{ ...mono, color: "var(--fg-mute)" }}>{st.exec}</span>}
-                {running && (
-                  <span style={{ fontSize: 11, color: "var(--fg-dim)" }}>{busyLine(st.exec, i)}</span>
-                )}
+                {running && <BusyLine exec={st.exec} />}
               </span>
             }
           >
@@ -272,7 +294,7 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
           className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
           style={{ border: "1px solid var(--border)", background: "var(--bg-1)" }}
         >
-          <Loader2Icon size={13} className="spin-slow" style={{ color: "var(--blue-500)" }} />
+          <span style={{ color: "var(--blue-500)" }}><AtomSpinner size={14} /></span>
           <span style={{ fontSize: 12, color: "var(--fg-mute)" }}>
             {material.length > 0 ? t("phasePlanning") : t("phaseLookup")}
           </span>

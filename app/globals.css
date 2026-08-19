@@ -887,3 +887,24 @@ button:not(:disabled),
 :root[data-theme="dark"] .hljs-built_in { color: #e0ad5a; }
 :root[data-theme="dark"] .hljs-title,
 :root[data-theme="dark"] .hljs-name { color: #6c8ce0; }
+
+/* The atom's shell turns slowly under the electrons' own motion, so the two
+   rates compose instead of reading as one rigid rotation. */
+.atom-shell {
+  transform-origin: 12px 12px;
+  animation: atom-spin 6s linear infinite;
+}
+@keyframes atom-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .atom-shell { animation: none; }
+}
+
+/* Each swap of the busy line fades in rather than jumping, so a status that
+   changes on its own does not read as a glitch. */
+.busy-line { animation: busy-fade .45s ease-out; }
+@keyframes busy-fade {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .busy-line { animation: none; } }
