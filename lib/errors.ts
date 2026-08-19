@@ -25,7 +25,18 @@ export function tr(err: ParsedError): string {
       if (typeof err.details.credits_needed === "number") opts.needed = err.details.credits_needed;
       if (typeof err.details.credits_remaining === "number") opts.remaining = err.details.credits_remaining;
     }
-    return i18n.t(key, opts) as string;
+    const text = i18n.t(key, opts) as string;
+    // "unknown" is a registered key, so a thrown fetch error used to have its
+    // real cause — "Failed to fetch", a connection reset — replaced by
+    // "Something went wrong" and thrown away. That is the one case where the
+    // underlying text is the ONLY diagnostic there is, so keep it.
+    if (err.code === "unknown" && err.message && err.message !== text) {
+      return `${text} (${err.message})`;
+    }
+    if (err.status && err.status >= 500) {
+      return `${text} (HTTP ${err.status})`;
+    }
+    return text;
   }
   return err.message || err.code;
 }
