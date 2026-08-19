@@ -29,6 +29,10 @@ const ACC: Accuracy[] = ["standard", "stringent"];
  * fully-relativistic LDA) moves the OTHER axis instead of rolling back the click.
  */
 export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
+  // In auto mode the three dropdowns are only the fallback for a request that
+  // names no library, so leaving them live implied a control they do not have.
+  const autoMode = (pseudo.mode ?? "auto") === "auto";
+  const axesDisabled = disabled || autoMode;
   const { t } = useTranslation();
   function pick(next: Partial<PseudoChoice>) {
     const merged = { ...pseudo, ...next };
@@ -80,7 +84,7 @@ export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
         </span>
         <span style={{ flex: 1 }} />
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--blue-500)" }}>
-          {pseudo.xc}·{pseudo.relativistic}·{pseudo.accuracy === "stringent" ? "str" : "std"}
+          {autoMode ? t("pseudoModeAuto") : `${pseudo.xc}·${pseudo.relativistic}·${pseudo.accuracy === "stringent" ? "str" : "std"}`}
         </span>
       </header>
 
@@ -93,16 +97,16 @@ export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
         </p>
 
         <div className="grid grid-cols-3 gap-1.5">
-          <select style={sel} disabled={disabled} value={pseudo.xc}
+          <select style={{ ...sel, opacity: axesDisabled ? 0.45 : 1 }} disabled={axesDisabled} value={pseudo.xc}
                   onChange={(e) => pick({ xc: e.target.value as Xc })} title={t("pseudoXc") as string}>
             {XC.map((x) => <option key={x} value={x}>{x}</option>)}
           </select>
-          <select style={sel} disabled={disabled} value={pseudo.relativistic}
+          <select style={{ ...sel, opacity: axesDisabled ? 0.45 : 1 }} disabled={axesDisabled} value={pseudo.relativistic}
                   onChange={(e) => pick({ relativistic: e.target.value as Relativistic })}
                   title={t("pseudoRel") as string}>
             {REL.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
-          <select style={sel} disabled={disabled} value={pseudo.accuracy}
+          <select style={{ ...sel, opacity: axesDisabled ? 0.45 : 1 }} disabled={axesDisabled} value={pseudo.accuracy}
                   onChange={(e) => pick({ accuracy: e.target.value as Accuracy })}
                   title={t("pseudoAcc") as string}>
             {ACC.map((a) => <option key={a} value={a}>{a}</option>)}
@@ -120,7 +124,7 @@ export function ImportantSettings({ pseudo, onPseudoChange, disabled }: Props) {
             handing the choice to the agent unconditionally is wrong for someone
             who does not know what the choice means. */}
         <div className="flex items-center gap-1 mt-2.5">
-          {(["manual", "auto"] as PseudoMode[]).map((m) => {
+          {(["auto", "manual"] as PseudoMode[]).map((m) => {
             const on = (pseudo.mode ?? "manual") === m;
             return (
               <button

@@ -83,9 +83,10 @@ export const DEFAULT_PSEUDO: PseudoChoice = {
   xc: "PBE",
   relativistic: "SR",
   accuracy: "standard",
-  // Manual by default: the website's audience is people meeting DFT for the
-  // first time, and a control that silently does nothing is worse than none.
-  mode: "manual",
+  // Auto by default: the agent reads the request, so someone who writes
+  // "with PBEsol" gets it without knowing a settings panel exists. Switching to
+  // manual is the deliberate act of taking the choice back.
+  mode: "auto",
 };
 
 export interface Conversation {
