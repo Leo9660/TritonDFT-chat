@@ -99,9 +99,10 @@ function parse(content: string) {
 }
 
 function Card({
-  icon, title, right, children, tone = "plain", defaultOpen = false, collapsible = true,
+  icon, title, subtitle, right, children, tone = "plain", defaultOpen = false, collapsible = true,
 }: {
-  icon: React.ReactNode; title: React.ReactNode; right?: React.ReactNode;
+  icon: React.ReactNode; title: React.ReactNode; subtitle?: React.ReactNode;
+  right?: React.ReactNode;
   children?: React.ReactNode; tone?: "plain" | "accent" | "error"; defaultOpen?: boolean;
   collapsible?: boolean;
 }) {
@@ -115,16 +116,20 @@ function Card({
       <button
         type="button"
         onClick={() => collapsible && setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left"
+        className="w-full flex items-start gap-2 px-3 py-2 text-left"
         style={{ cursor: collapsible ? "pointer" : "default" }}
       >
         {collapsible ? (
-          <ChevronRightIcon size={12} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", opacity: 0.55 }} />
-        ) : <span style={{ width: 12 }} />}
-        {icon}
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg)" }}>{title}</span>
-        <span style={{ flex: 1 }} />
-        {right}
+          <ChevronRightIcon size={12} className="shrink-0" style={{ marginTop: 3, transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", opacity: 0.55 }} />
+        ) : <span className="shrink-0" style={{ width: 12 }} />}
+        <span className="shrink-0" style={{ marginTop: 1 }}>{icon}</span>
+        {/* Title and its status stack, so a running step's line gets a row of
+            its own instead of competing with the binary badge on the right. */}
+        <span className="min-w-0" style={{ flex: 1 }}>
+          <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--fg)" }}>{title}</span>
+          {subtitle}
+        </span>
+        <span className="shrink-0" style={{ marginTop: 1 }}>{right}</span>
       </button>
       {open && children && <div className="px-3 pb-3">{children}</div>}
     </div>
@@ -184,7 +189,7 @@ function BusyLine({ exec }: { exec?: string }) {
     <span
       key={i}
       className="busy-line"
-      style={{ fontSize: 11, color: "var(--fg-dim)" }}
+      style={{ display: "block", marginTop: 2, fontSize: 11.5, color: "var(--fg-dim)" }}
     >
       {lines[i % lines.length]}
     </span>
@@ -264,12 +269,8 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
                 {st.title}
               </span>
             }
-            right={
-              <span className="flex items-center gap-2">
-                {st.exec && <span style={{ ...mono, color: "var(--fg-mute)" }}>{st.exec}</span>}
-                {running && <BusyLine exec={st.exec} />}
-              </span>
-            }
+            subtitle={running ? <BusyLine exec={st.exec} /> : undefined}
+            right={st.exec && <span style={{ ...mono, color: "var(--fg-mute)" }}>{st.exec}</span>}
           >
             <pre
               className="mt-1 overflow-x-auto"
