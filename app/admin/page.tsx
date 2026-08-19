@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeftIcon, BanIcon, CheckCircle2Icon, CpuIcon, InfinityIcon, PencilIcon, RefreshCwIcon, ShieldIcon } from "lucide-react";
+import { ArrowLeftIcon, BanIcon, CheckCircle2Icon, CpuIcon, InfinityIcon, KeyRoundIcon, PencilIcon, RefreshCwIcon, RotateCcwIcon, ShieldIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { authFetch } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
@@ -17,6 +17,130 @@ interface AdminUser {
   can_use_cpu: boolean;
   created_at: string;
   last_login_at: string | null;
+}
+
+interface KeyStatus {
+  source: "environment" | "override";
+  fingerprint: string;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+/** Rotate the OpenAI key without kubectl.
+ *
+ * The key normally lives in the k8s secret, which needs cluster access and a
+ * rollout to change — not a workable path when it runs out of credit during a
+ * workshop. The value is never displayed: the API returns only a last-4
+ * fingerprint, which is enough to tell two keys apart and not enough to use
+ * one. "Revert" drops the override and falls back to the secret.
+ */
+function OpenAiKeyCard() {
+  const [status, setStatus] = useState<KeyStatus | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await authFetch("/admin/settings/openai-key");
+      if (r.ok) setStatus(await r.json());
+    } catch { /* the card just stays blank */ }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function save() {
+    const key = draft.trim();
+    if (!key) return;
+    setBusy(true);
+    try {
+      const r = await authFetch("/admin/settings/openai-key", {
+        method: "PUT",
+        body: JSON.stringify({ key }),
+      });
+      if (!r.ok) { alert(tr(await parseResponseError(r))); return; }
+      setStatus(await r.json());
+      setDraft("");
+    } catch (e: unknown) {
+      alert(tr(fromThrown(e)));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revert() {
+    if (!confirm("Drop the override and go back to the key in the k8s secret?")) return;
+    setBusy(true);
+    try {
+      const r = await authFetch("/admin/settings/openai-key", { method: "DELETE" });
+      if (r.ok) setStatus(await r.json());
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const field = {
+    background: "var(--bg-0)",
+    color: "var(--fg)",
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    fontSize: 13,
+    padding: "8px 12px",
+    outline: "none",
+  } as const;
+
+  return (
+    <div style={{
+      background: "var(--bg-1)", border: "1px solid var(--border)",
+      borderRadius: 12, padding: "14px 16px", marginBottom: 20,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <KeyRoundIcon size={14} style={{ color: "var(--blue-500)" }} />
+        <strong style={{ fontSize: 13 }}>OpenAI API key</strong>
+        <span style={{ flex: 1 }} />
+        {status && (
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-dim)" }}>
+            {status.source === "override" ? "override" : "k8s secret"} · {status.fingerprint}
+          </span>
+        )}
+      </div>
+      <p style={{ color: "var(--fg-mute)", fontSize: 12, margin: "0 0 10px" }}>
+        {status?.source === "override"
+          ? `Set by ${status.updated_by ?? "an admin"}${status.updated_at ? ` on ${new Date(status.updated_at).toLocaleString()}` : ""}. Workers pick it up on their next job.`
+          : "Currently using the key from the k8s secret. Setting one here overrides it without a redeploy."}
+      </p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input
+          type="password"
+          autoComplete="off"
+          placeholder="sk-…"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          style={{ ...field, flex: 1, minWidth: 220, fontFamily: "var(--font-mono)" }}
+        />
+        <button
+          onClick={save}
+          disabled={busy || !draft.trim()}
+          style={{
+            ...field, cursor: "pointer", fontWeight: 600,
+            background: "var(--grad-primary)", color: "#fff", border: "none",
+            opacity: busy || !draft.trim() ? 0.45 : 1,
+          }}
+        >
+          Set key
+        </button>
+        {status?.source === "override" && (
+          <button
+            onClick={revert}
+            disabled={busy}
+            title="Revert to the k8s secret"
+            style={{ ...field, cursor: "pointer", color: "var(--fg-mute)", display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            <RotateCcwIcon size={13} /> Revert
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function AdminPage() {
@@ -155,6 +279,8 @@ export default function AdminPage() {
         <p style={{ color: "var(--fg-mute)", margin: "0 0 24px" }}>
           {users.length} user{users.length === 1 ? "" : "s"} · You are signed in as <strong>{auth.user?.email}</strong>
         </p>
+
+        <OpenAiKeyCard />
 
         <input
           type="search"
