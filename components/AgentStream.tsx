@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchJobFiles, fetchJobFileText } from "@/lib/api";
 import { useTranslation } from "react-i18next";
 import {
@@ -256,38 +256,42 @@ function BusyLine({ exec }: { exec?: string }) {
 }
 
 
-/** A step's expandable body: the input Quantum ESPRESSO wrote, and the log it
- *  produced. The input is the artifact a user actually checks to decide whether
- *  to trust a number, so it belongs here next to the output rather than only in
- *  the downloadable bundle.
+/** A step's expandable body: the input Quantum ESPRESSO was given, and the log
+ *  it produced. The input is the artifact a user actually checks to decide
+ *  whether to trust a number, so it belongs next to the output rather than only
+ *  in the downloadable bundle.
  *
- *  Fetched lazily on first view of the tab: during a live run the files land on
- *  disk step by step, and requesting them for every step up front would be a
- *  burst of requests for panels nobody opened.
+ *  `findInput` is shared across every step so the directory listing is fetched
+ *  once per run, not once per step. That listing is the slow part: the run
+ *  directory lives on a PVC that eight workers are writing QE intermediates to,
+ *  and iterdir+stat over it is not fast under that load.
  */
-function StepBody({ jobId, index, log }: { jobId?: string; index: string; log: string[] }) {
+function StepBody({
+  index, log, findInput,
+}: {
+  index: string;
+  log: string[];
+  findInput?: (index: string) => Promise<string | null>;
+}) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<"log" | "input">("log");
   const [input, setInput] = useState<string | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "missing">("idle");
 
   useEffect(() => {
-    if (tab !== "input" || input != null || state !== "idle" || !jobId) return;
+    if (tab !== "input" || input != null || state !== "idle" || !findInput) return;
+    let alive = true;
     setState("loading");
-    (async () => {
-      // Files are named <zero-padded step>_<task>.in — 03_nscf.in for step 3.
-      const n = index.split("/")[0].padStart(2, "0");
-      try {
-        const files = await fetchJobFiles(jobId);
-        const f = files.find((x) => x.name.startsWith(n + "_") && x.name.endsWith(".in"));
-        if (!f) { setState("missing"); return; }
-        setInput(await fetchJobFileText(jobId, f.name));
-        setState("idle");
-      } catch {
-        setState("missing");
-      }
-    })();
-  }, [tab, input, state, jobId, index]);
+    findInput(index).then(
+      (text) => {
+        if (!alive) return;
+        if (text == null) setState("missing");
+        else { setInput(text); setState("idle"); }
+      },
+      () => alive && setState("missing"),
+    );
+    return () => { alive = false; };
+  }, [tab, input, state, findInput, index]);
 
   const pre = {
     ...mono, lineHeight: 1.5, color: "var(--fg-mute)", whiteSpace: "pre-wrap" as const,
@@ -314,7 +318,7 @@ function StepBody({ jobId, index, log }: { jobId?: string; index: string; log: s
     <>
       <div className="flex items-center gap-1 mt-1 mb-1.5">
         <Tab id="log" label={t("tabOutput")} />
-        {jobId && <Tab id="input" label={t("tabInput")} />}
+        {findInput && <Tab id="input" label={t("tabInput")} />}
       </div>
       {tab === "log" ? (
         <pre className="overflow-x-auto" style={pre}>{log.join("\n") || t("noOutputYet")}</pre>
@@ -330,6 +334,37 @@ function StepBody({ jobId, index, log }: { jobId?: string; index: string; log: s
 export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Props) {
   const { t } = useTranslation();
   const { material, plan, steps, notice } = useMemo(() => parse(content), [content]);
+
+  // One directory listing per run, shared by every step, plus a per-file text
+  // cache so re-opening a tab is instant. During a live run files appear as
+  // steps finish, so a listing that does not contain the wanted file is
+  // refreshed once rather than trusted.
+  const listing = useRef<Promise<{ name: string }[]> | null>(null);
+  const texts = useRef<Map<string, string>>(new Map());
+
+  const findInput = useCallback(
+    async (index: string): Promise<string | null> => {
+      if (!jobId) return null;
+      const prefix = index.split("/")[0].padStart(2, "0") + "_";
+      const pick = (fs: { name: string }[]) =>
+        fs.find((f) => f.name.startsWith(prefix) && f.name.endsWith(".in"))?.name;
+
+      if (!listing.current) listing.current = fetchJobFiles(jobId);
+      let name = pick(await listing.current);
+      if (!name) {
+        listing.current = fetchJobFiles(jobId);
+        name = pick(await listing.current);
+      }
+      if (!name) return null;
+
+      const hit = texts.current.get(name);
+      if (hit != null) return hit;
+      const text = await fetchJobFileText(jobId, name);
+      texts.current.set(name, text);
+      return text;
+    },
+    [jobId],
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -458,7 +493,7 @@ export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Prop
               </span>
             }
           >
-            <StepBody jobId={jobId} index={st.index} log={st.log} />
+            <StepBody index={st.index} log={st.log} findInput={jobId ? findInput : undefined} />
           </Card>
         );
       })}
