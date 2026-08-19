@@ -123,6 +123,14 @@ function parse(content: string) {
   return { material, plan, steps, notice };
 }
 
+/** "pw.x (vc-relax)" -> "vc-relax"; "bands.x" -> "bands.x".
+ *  The mode is what distinguishes one pw.x step from another, so it is the
+ *  short name; a post-processor has no mode and its binary already reads as one. */
+function shortStep(binary: string): string {
+  const m = binary.match(/\(([^)]+)\)/);
+  return (m ? m[1] : binary).trim();
+}
+
 function Card({
   icon, title, subtitle, right, children, tone = "plain", defaultOpen = false, collapsible = true,
 }: {
@@ -158,7 +166,7 @@ function Card({
           <span style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--fg)" }}>{title}</span>
           {subtitle}
         </span>
-        <span className="shrink-0" style={{ marginTop: 1 }}>{right}</span>
+        <span style={{ marginTop: 1, minWidth: 0 }}>{right}</span>
       </button>
       {showChildren && children && <div className="px-3 pb-3">{children}</div>}
     </div>
@@ -345,13 +353,30 @@ export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Prop
           </div>
         </Card>
       )}
-      {/* 3. The plan. */}
+      {/* 3. The plan: the whole workflow on one line, expandable for the
+             per-step descriptions. The descriptions are full sentences and
+             stacking five of them pushed everything else off screen, while the
+             thing a reader wants at a glance is the shape of the workflow. */}
       {plan.length > 0 && (
         <Card
-          collapsible={false}
           icon={<ListChecksIcon size={13} style={{ color: "var(--blue-500)" }} />}
           title={t("planTitle")}
-          right={<span style={{ ...mono, color: "var(--fg-dim)" }}>{plan.length} {t("stepsWord")}</span>}
+          right={
+            <span
+              style={{
+                ...mono, color: "var(--fg-mute)", whiteSpace: "nowrap",
+                overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%",
+              }}
+            >
+              {plan.map((p, i) => (
+                <span key={p.index}>
+                  {i > 0 && <span style={{ color: "var(--fg-dim)", margin: "0 5px" }}>→</span>}
+                  <span style={{ color: "var(--fg-dim)" }}>{i + 1} </span>
+                  {shortStep(p.binary)}
+                </span>
+              ))}
+            </span>
+          }
         >
           <ol className="flex flex-col gap-1 mt-1">
             {plan.map((p) => (
