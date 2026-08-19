@@ -132,6 +132,41 @@ function Card({
 
 const mono = { fontFamily: "var(--font-mono)", fontSize: 11 } as const;
 
+/* What the step is actually doing, in words. Shown while it runs instead of a
+ * bare "computing…", so the wait also explains the physics. Keyed off the QE
+ * binary and mode, which the plan already gives us. */
+const BUSY: [RegExp, string][] = [
+  [/vc-relax/i,   "Letting the cell settle into its equilibrium shape…"],
+  [/pw\.x.*relax/i, "Letting the atoms find their positions…"],
+  // nscf must be tested before scf — "nscf" contains "scf".
+  [/nscf/i,       "Counting occupied states…"],
+  [/\bscf/i,      "Waiting for the electrons to agree with themselves…"],
+  [/pw\.x.*bands/i, "Travelling the high-symmetry path across the Brillouin zone…"],
+  [/bands\.x/i,   "Turning eigenvalues into a band structure…"],
+  [/dos\.x/i,     "Tallying the density of states…"],
+  [/projwfc/i,    "Sorting states by orbital character…"],
+  [/ph\.x/i,      "Nudging the atoms to hear how the lattice answers…"],
+  [/q2r/i,        "Fourier-transforming into real-space force constants…"],
+  [/matdyn/i,     "Interpolating phonons along the q-path…"],
+  [/dynmat/i,     "Reading off the Γ-point modes…"],
+  [/ev\.x/i,      "Fitting the equation of state…"],
+];
+
+/* Occasional stand-ins, so a long run is not the same sentence forever. */
+const ASIDES = [
+  "Consulting Kohn and Sham…",
+  "Negotiating with the exchange-correlation functional…",
+  "Asking Bloch to confirm the periodicity…",
+];
+
+/** Deterministic in the step index: it must not reshuffle on every re-render,
+ *  and a random pick would also differ between server and client markup. */
+function busyLine(exec: string | undefined, stepIndex: number): string {
+  if (stepIndex > 0 && stepIndex % 4 === 3) return ASIDES[(stepIndex / 4) | 0 % ASIDES.length];
+  const hit = BUSY.find(([re]) => re.test(exec || ""));
+  return hit ? hit[1] : "Working…";
+}
+
 export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
   const { t } = useTranslation();
   const { material, plan, steps } = useMemo(() => parse(content), [content]);
@@ -208,7 +243,9 @@ export function AgentStream({ content, isStreaming, pseudo, model }: Props) {
             right={
               <span className="flex items-center gap-2">
                 {st.exec && <span style={{ ...mono, color: "var(--fg-mute)" }}>{st.exec}</span>}
-                {running && <span style={{ fontSize: 11, color: "var(--fg-dim)" }}>{t("computing")}</span>}
+                {running && (
+                  <span style={{ fontSize: 11, color: "var(--fg-dim)" }}>{busyLine(st.exec, i)}</span>
+                )}
               </span>
             }
           >
