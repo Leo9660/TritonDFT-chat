@@ -60,6 +60,9 @@ const DROP_RE = /^\[?(parser|runner)\]?\s*(cmd:|Output \d+: trimmed)|Parameters 
 function parse(content: string) {
   const material: string[] = [];
   const plan: PlanRow[] = [];
+  // What the run ACTUALLY used. In auto mode the settings panel can only show
+  // the fallback, so the panel's triple is not necessarily what ran.
+  let pseudoUsed = "";
   const steps: StepCard[] = [];
   let cur: StepCard | null = null;
   // The backend appends a "> ⏹ Stopped." / "> ⚠️ …" trailer on a terminal run.
@@ -81,6 +84,12 @@ function parse(content: string) {
     if (n) { notice = n[1].trim(); continue; }
 
     if (tag === "mp") { material.push(body); continue; }
+
+    if (tag === "pseudo") {
+      const m = body.match(/^Library for this run:\s*(.+)$/i);
+      if (m) pseudoUsed = m[1].trim();
+      continue;
+    }
 
     if (tag === "plan") {
       const p = body.match(PLAN_RE);
@@ -128,7 +137,7 @@ function parse(content: string) {
     if (row) st.exec = row.binary;
   });
 
-  return { material, plan, steps, notice };
+  return { material, plan, steps, notice, pseudoUsed };
 }
 
 /** "pw.x (vc-relax)" -> "vc-relax"; "bands.x" -> "bands.x".
@@ -345,7 +354,7 @@ function StepBody({
 
 export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Props) {
   const { t } = useTranslation();
-  const { material, plan, steps, notice } = useMemo(() => parse(content), [content]);
+  const { material, plan, steps, notice, pseudoUsed } = useMemo(() => parse(content), [content]);
 
   // One request per step, resolved server-side by the step's own filename.
   // Listing the whole run directory and filtering here meant an iterdir+stat
@@ -377,7 +386,14 @@ export function AgentStream({ content, isStreaming, pseudo, model, jobId }: Prop
           right={
             <span style={{ ...mono, color: "var(--fg-mute)" }}>
               {model}
-              {pseudo ? ` · ${pseudo.xc} · ${pseudo.relativistic} · ${pseudo.accuracy}` : ""}
+              {/* Prefer what the run reported over what the panel was set to —
+                  under auto they are often not the same thing. */}
+              {pseudoUsed
+                ? ` · ${pseudoUsed}`
+                : pseudo
+                  ? ` · ${pseudo.xc} · ${pseudo.relativistic} · ${pseudo.accuracy}`
+                    + (pseudo.mode === "auto" ? ` · ${t("pseudoPending")}` : "")
+                  : ""}
             </span>
           }
         />
