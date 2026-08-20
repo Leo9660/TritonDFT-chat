@@ -9,7 +9,8 @@ export interface ModelOption {
 }
 
 export const MODELS: ModelOption[] = [
-  { id: "gpt-5.2", label: "GPT-5.2", hint: "Newest flagship (default)" },
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", hint: "Highest accuracy" },
+  { id: "gpt-5.2", label: "GPT-5.2", hint: "Flagship (default)" },
   { id: "gpt-5.1", label: "GPT-5.1", hint: "Flagship" },
   { id: "gpt-5", label: "GPT-5", hint: "Flagship" },
   { id: "gpt-5-mini", label: "GPT-5 mini", hint: "Cheaper, fast" },
